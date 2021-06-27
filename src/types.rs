@@ -2,7 +2,7 @@ use reqwest::header::HeaderValue;
 use sha2::Digest as Sha2Digest;
 use sha2::Sha256;
 use std::str::FromStr;
-use strum::EnumString;
+
 use warp::hyper::body::Bytes;
 
 #[derive(Clone, Debug)]
@@ -84,8 +84,6 @@ impl FromStr for Digest {
     type Err = DigestParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use crate::log;
-
         let mut parts = s.split(":");
         let algo = parts
             .next()

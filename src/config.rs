@@ -1,7 +1,6 @@
 use once_cell::sync::OnceCell;
 use reqwest::Url;
 use serde::de::{self, Deserialize, Deserializer};
-use std::path::PathBuf;
 
 use crate::blobstore::filesystem::FileSystemBlobStoreConfig;
 

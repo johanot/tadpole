@@ -14,33 +14,25 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use std::net::IpAddr;
-use std::time::Instant;
-
 use signal_hook::consts::{SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 
 use crate::blobstore::filesystem::FileSystemBlobStore;
 use crate::blobstore::{BlobError, BlobSpec, BlobStore, ToBlobStore};
 use crate::config::Config;
-use crate::types::{Digest, DigestAlgo};
+use crate::types::Digest;
 
 use warp::hyper::body::Bytes;
 
-use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
 use tokio::sync::oneshot;
 
 use serde_json::json;
 
-use warp::http::{Request, Response, StatusCode};
+use warp::http::{Response, StatusCode};
 use warp::log::Info;
 use warp::path;
-use warp::Stream;
-
-use std::sync::Mutex;
-use uuid::Uuid;
 
 mod blobstore;
 mod config;
@@ -279,18 +271,11 @@ fn start_upload_blob(name: String) -> impl warp::Reply {
         .body("")
 }
 
-use core::iter::Chain;
 use futures::stream::StreamExt;
-use std::collections::HashMap;
+
 use std::convert::Infallible;
-use std::fs::OpenOptions;
-use std::io::copy;
-use std::io::BufWriter;
-use std::io::Read;
-use std::io::Write;
+
 use std::iter::Iterator;
-use std::path::PathBuf;
-use warp::Buf;
 
 async fn patch_upload(
     name: String,
@@ -342,7 +327,7 @@ async fn complete_upload(
         blob_store.patch(&uuid, input).await.unwrap();
     }
     use std::str::FromStr;
-    let total = blob_store
+    let _total = blob_store
         .complete_upload(
             &uuid,
             &Digest::from_str(&mu.digest.as_ref().unwrap()).unwrap(),
@@ -368,7 +353,7 @@ async fn complete_upload(
 
 async fn put_manifests(
     name: String,
-    reference: String,
+    _reference: String,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
@@ -417,7 +402,7 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
         .body("")
 }
 
-fn head_manifests(name: String, tag: String) -> impl warp::Reply {
+fn head_manifests(_name: String, _tag: String) -> impl warp::Reply {
     Response::builder()
         .header("Docker-Distribution-API-Version", "registry/v2.0")
         .status(StatusCode::NOT_FOUND)

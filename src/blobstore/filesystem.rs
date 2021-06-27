@@ -8,19 +8,19 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::io::BufWriter;
-use std::io::Read;
+
 use std::path::PathBuf;
 use uuid::Uuid;
-use warp::{Buf, Stream};
+
 
 use crate::types::{ContentType, Digest as TadpoleDigest, DigestAlgo};
 
-use futures::stream::StreamExt;
-use std::convert::Infallible;
-use std::io::Write;
-use std::iter::Iterator;
 
-use std::sync::Arc;
+
+use std::io::Write;
+
+
+
 use warp::hyper::body::Bytes;
 
 use std::io::BufRead;
@@ -70,7 +70,7 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
         }
     }
 
-    fn get(&self, spec: &BlobSpec) -> Result<Blob, BlobError> {
+    fn get(&self, _spec: &BlobSpec) -> Result<Blob, BlobError> {
         Err(BlobError::NotFound)
     }
 
