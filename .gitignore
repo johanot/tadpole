@@ -1,0 +1,12 @@
+*.iml
+.idea
+/target
+/blobstore
+**/*.rs.bk
+*.password
+result*
+*.log
+
+
+# to avoid accidental commit of test certs
+*.pem

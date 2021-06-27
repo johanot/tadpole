@@ -1,0 +1,8 @@
+{
+  "listen_port": 8094,
+  "blob_store": {
+    "filesystem": {
+      "store_path": "blobstore"
+    }
+  }
+}
