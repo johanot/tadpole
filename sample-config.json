@@ -4,5 +4,10 @@
     "filesystem": {
       "store_path": "blobstore"
     }
+  },
+  "metadata_store": {
+    "filesystem": {
+      "tags_path": "metadatastore/tags"
+    }
   }
 }

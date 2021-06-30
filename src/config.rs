@@ -3,6 +3,7 @@ use reqwest::Url;
 use serde::de::{self, Deserialize, Deserializer};
 
 use crate::blobstore::filesystem::FileSystemBlobStoreConfig;
+use crate::metadatastore::filesystem::FileSystemMetadataStoreConfig;
 
 static CONFIG: OnceCell<Config> = OnceCell::new();
 
@@ -21,6 +22,7 @@ impl Config {
 pub struct Config {
     pub listen_port: u16,
     pub blob_store: BlobStoreConfig,
+    pub metadata_store: MetadataStoreConfig,
 }
 
 #[derive(Deserialize, Debug)]
@@ -33,6 +35,21 @@ pub struct BlobStoreConfig {
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3BlobStoreConfig {
+    #[serde(deserialize_with = "deserialize_url")]
+    pub url: Url,
+    //TODO: moar fields
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataStoreConfig {
+    pub etcd: Option<EtcdMetadataStoreConfig>,
+    pub filesystem: Option<FileSystemMetadataStoreConfig>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct EtcdMetadataStoreConfig {
     #[serde(deserialize_with = "deserialize_url")]
     pub url: Url,
     //TODO: moar fields

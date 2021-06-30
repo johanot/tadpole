@@ -1443,6 +1443,7 @@ dependencies = [
  "dbc-rust-modules",
  "futures",
  "hex",
+ "hyper",
  "lazy_static",
  "once_cell",
  "pretty_env_logger",

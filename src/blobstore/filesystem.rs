@@ -24,6 +24,7 @@ use std::io::Write;
 use warp::hyper::body::Bytes;
 
 use std::io::BufRead;
+use std::io::Read;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -50,7 +51,9 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
         Ok(Self { config })
     }
 
-    fn head(&self, spec: &BlobSpec) -> Result<BlobInfo, BlobError> {
+    fn stat<S: Into<BlobSpec>>(&self, spec: S) -> Result<BlobInfo, BlobError> {
+        let spec: BlobSpec = spec.into();
+        
         let full_path = self
             .config
             .store_path
@@ -64,14 +67,26 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
                     content_type: ContentType::OctetStream,
                     size: fs_meta.len(),
                     digest: spec.digest.clone(),
+                    path: full_path.clone(),
                 })
             }
             false => Err(BlobError::NotFound),
         }
     }
 
-    fn get(&self, _spec: &BlobSpec) -> Result<Blob, BlobError> {
-        Err(BlobError::NotFound)
+    fn get<S: Into<BlobSpec>>(&self, spec: S) -> Result<Blob, BlobError> {
+        let info = self.stat(spec)?;
+
+        let mut f = File::open(&info.path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
+        let mut buffer = Vec::with_capacity(info.size as usize);
+    
+        //TODO: stream instead of buffering entire blob to memory
+        f.read_to_end(&mut buffer).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
+
+        Ok(Blob{
+            info,
+            body: buffer.into(),
+        })
     }
 
     fn start_upload(&self) -> Result<UploadID, BlobError> {
@@ -98,8 +113,8 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
 
         let len = file.metadata().unwrap().len();
         if !input.is_empty() {
-            let mut writer = BufWriter::with_capacity(8 * 1024 * 1024, &mut file);
-            let mut reader = BufReader::with_capacity(8 * 1024 * 1024, &*input);
+            let mut writer = BufWriter::with_capacity(1024 * 1024, &mut file);
+            let mut reader = BufReader::with_capacity(1024 * 1024, &*input);
 
             let written = std::io::copy(&mut reader, &mut writer).unwrap();
 

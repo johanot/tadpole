@@ -19,7 +19,10 @@ use signal_hook::iterator::Signals;
 
 use crate::blobstore::filesystem::FileSystemBlobStore;
 use crate::blobstore::{BlobError, BlobSpec, BlobStore, ToBlobStore};
+use crate::metadatastore::{Manifest, ManifestSpec, ImageRef, MetadataStore, ToMetadataStore, MetadataError};
+use crate::metadatastore::filesystem::FileSystemMetadataStore;
 use crate::config::Config;
+use crate::config::MetadataStoreConfig;
 use crate::types::Digest;
 
 use warp::hyper::body::Bytes;
@@ -35,6 +38,7 @@ use warp::log::Info;
 use warp::path;
 
 mod blobstore;
+mod metadatastore;
 mod config;
 mod types;
 /*
@@ -51,15 +55,6 @@ struct RequestLog {
     path: String,
     status: u16,
     elapsed: u128,
-}
-
-fn warp_info_to_request_log(info: &Info) -> RequestLog {
-    RequestLog {
-        method: info.method().to_string(),
-        path: info.path().to_string(),
-        status: info.status().as_u16(),
-        elapsed: info.elapsed().as_millis(),
-    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -157,7 +152,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .with(warp::compression::gzip());
 
     let put_manifests = warp::put()
-        .and(path!("v2" / String / "manifests" / String))
+        .and(path!("v2" / String / "manifests" / ImageRef))
         .and(warp::filters::body::bytes())
         .and_then(put_manifests)
         .with(warp::compression::gzip());
@@ -187,8 +182,11 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .and(path!("v2" / String / "blobs" / Digest))
         .map(head_blob);
     let head_manifests = warp::head()
-        .and(path!("v2" / String / "manifests" / String))
+        .and(path!("v2" / String / "manifests" / ImageRef))
         .map(head_manifests);
+    let get_manifests = warp::get()
+        .and(path!("v2" / String / "manifests" / ImageRef))
+        .map(get_manifests);
 
     let routes = version_check
         .or(start_upload_blob)
@@ -197,6 +195,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .or(complete_upload)
         .or(upload_check)
         .or(head_manifests)
+        .or(get_manifests)
         .or(put_manifests)
         .with(log);
     //let get_blob = warp::get().and(path!("v2" / String / "blobs" / String)).map(start_upload_blob);
@@ -223,7 +222,7 @@ fn head_blob(repo: String, digest: Digest) -> impl warp::Reply {
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
 
-    let builder = match blob_store.head(&BlobSpec { repo, digest }) {
+    let builder = match blob_store.stat(BlobSpec { digest }) {
         Ok(info) => builder
             .status(StatusCode::OK)
             .header("Content-Length", info.size.to_string())
@@ -353,7 +352,7 @@ async fn complete_upload(
 
 async fn put_manifests(
     name: String,
-    _reference: String,
+    tag: ImageRef,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
@@ -373,13 +372,25 @@ async fn put_manifests(
         .await
         .unwrap();
 
+    let metadata_store: FileSystemMetadataStore = config
+        .metadata_store
+        .filesystem
+        .as_ref()
+        .unwrap()
+        .to_metadata_store();
+    
+    metadata_store.write_spec(&ManifestSpec{
+        name: name.clone(),
+        reference: tag.clone(),
+    }, &digest).unwrap();
+
     Ok(Response::builder()
         .header(
             "Location",
             format!(
-                "/v2/{name}/manifests/{digest}",
+                "/v2/{name}/manifests/{tag}",
                 name = &name,
-                digest = &digest.to_typefixed_string()
+                tag = &tag.to_string()
             ),
         )
         .header("Content-Length", 0)
@@ -402,9 +413,138 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
         .body("")
 }
 
-fn head_manifests(_name: String, _tag: String) -> impl warp::Reply {
+fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError> {
+    let config = Config::get();
+
+    let metadata_store: FileSystemMetadataStore = config
+        .metadata_store
+        .filesystem
+        .as_ref()
+        .unwrap()
+        .to_metadata_store();
+  
+    let blob_store: FileSystemBlobStore = config
+        .blob_store
+        .filesystem
+        .as_ref()
+        .unwrap()
+        .to_blob_store();
+  
+    metadata_store
+        .read_spec(&ManifestSpec{
+            name: name.clone(),
+            reference: tag.clone(),
+        }).map_err(std::convert::Into::<ManifestError>::into)
+        .and_then(|digest| blob_store.get(BlobSpec{
+            digest: digest.clone(),
+        }).map_err(std::convert::Into::<ManifestError>::into))
+}
+
+fn head_manifests(name: String, tag: ImageRef) -> impl warp::Reply {
+    manifest(name, tag)
+        .to_response()
+        .empty()
+}
+
+fn get_manifests(name: String, tag: ImageRef) -> impl warp::Reply {
+    manifest(name, tag)
+        .to_response()
+        .emit()
+}
+
+use warp::http::response::Builder;
+
+fn registry_response() -> Builder {
     Response::builder()
         .header("Docker-Distribution-API-Version", "registry/v2.0")
-        .status(StatusCode::NOT_FOUND)
-        .body("")
+}
+
+trait ToResponse {
+    fn to_response(&self) -> Envelope;
+}
+
+impl ToResponse for Manifest {
+    fn to_response(&self) -> Envelope {
+        Envelope {
+            builder,
+            body: self.body,
+        }
+        registry_response()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+            .header("Content-Length", &self.info.size.to_string())
+            .header("Docker-Content-Digest", &self.info.digest.to_typefixed_string())
+            .into()
+    }
+}
+
+#[derive(Debug)]
+pub enum ManifestError {
+    NotFound,
+    Other { inner: Box<dyn std::fmt::Debug> },
+}
+
+impl ToResponse for ManifestError {
+    fn to_response(&self) -> Envelope {
+        let status = match self {
+            ManifestError::NotFound => StatusCode::NOT_FOUND,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+
+        registry_response().status(status).into()
+    }
+}
+
+impl <A, B>ToResponse for Result<A, B> where A: ToResponse, B: ToResponse {
+    fn to_response(&self) -> Envelope {
+        match self {
+            Ok(a) => a.to_response(),
+            Err(b) => b.to_response(),
+        }
+    }
+}
+
+impl std::convert::From<BlobError> for ManifestError {
+    fn from(e: BlobError) -> ManifestError {
+        match e {
+            BlobError::NotFound => ManifestError::NotFound,
+            e => ManifestError::Other { inner: Box::new(e) },
+        }
+    }
+}
+
+impl std::convert::From<MetadataError> for ManifestError {
+    fn from(e: MetadataError) -> ManifestError {
+        match e {
+            MetadataError::NotFound => ManifestError::NotFound,
+            e => ManifestError::Other { inner: Box::new(e) },
+        }
+    }
+}
+
+impl std::convert::From<Builder> for Envelope {
+    fn from(builder: Builder) -> Self {
+        Envelope {
+            body: Some("".into()),
+            builder: Some(builder),
+        }
+    }
+}
+
+use std::sync::Arc;
+
+
+#[derive(Debug)]
+struct Envelope {
+    body: Option<warp::hyper::Body>,
+    builder: Option<Builder>,
+}
+
+impl Envelope {
+    fn emit(mut self) -> impl warp::Reply {
+        self.builder.take().unwrap().body(self.body.take().unwrap())
+    }
+    fn empty(mut self) -> impl warp::Reply {
+        self.builder.take().unwrap().body("")
+    }
 }
