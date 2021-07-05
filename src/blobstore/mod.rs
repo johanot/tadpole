@@ -54,7 +54,7 @@ pub struct BlobInfo {
 
 pub struct Blob {
     pub info: BlobInfo,
-    pub body: warp::hyper::Body,
+    pub body: Option<warp::hyper::Body>,
 }
 
 impl std::convert::From<BlobInfo> for BlobSpec {

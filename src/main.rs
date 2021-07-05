@@ -181,6 +181,9 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     let head_blob = warp::head()
         .and(path!("v2" / String / "blobs" / Digest))
         .map(head_blob);
+    let get_blob = warp::get()
+        .and(path!("v2" / String / "blobs" / Digest))
+        .map(get_blob);
     let head_manifests = warp::head()
         .and(path!("v2" / String / "manifests" / ImageRef))
         .map(head_manifests);
@@ -191,6 +194,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     let routes = version_check
         .or(start_upload_blob)
         .or(head_blob)
+        .or(get_blob)
         .or(patch_upload)
         .or(complete_upload)
         .or(upload_check)
@@ -232,6 +236,28 @@ fn head_blob(repo: String, digest: Digest) -> impl warp::Reply {
     };
 
     builder.body("")
+}
+
+fn get_blob(repo: String, digest: Digest) -> impl warp::Reply {
+    let config = Config::get();
+    let blob_store: FileSystemBlobStore = config
+        .blob_store
+        .filesystem
+        .as_ref()
+        .unwrap()
+        .to_blob_store();
+
+    let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
+
+    match blob_store.get(BlobSpec { digest }) {
+        Ok(mut blob) => builder
+            .status(StatusCode::OK)
+            .header("Content-Length", blob.info.size.to_string())
+            .header("Content-Type", blob.info.content_type)
+            .body(blob.body.take().unwrap()),
+        Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body("".into()),
+        Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body("".into()),
+    }
 }
 
 fn start_upload_blob(name: String) -> impl warp::Reply {
@@ -460,21 +486,22 @@ fn registry_response() -> Builder {
 }
 
 trait ToResponse {
-    fn to_response(&self) -> Envelope;
+    fn to_response(&mut self) -> Envelope;
 }
 
 impl ToResponse for Manifest {
-    fn to_response(&self) -> Envelope {
-        Envelope {
-            builder,
-            body: self.body,
-        }
-        registry_response()
+    fn to_response(&mut self) -> Envelope {
+
+        let builder = registry_response()
             .status(StatusCode::OK)
             .header("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
             .header("Content-Length", &self.info.size.to_string())
-            .header("Docker-Content-Digest", &self.info.digest.to_typefixed_string())
-            .into()
+            .header("Docker-Content-Digest", &self.info.digest.to_typefixed_string());
+
+        Envelope {
+            builder: Some(builder),
+            body: self.body.take(),
+        }
     }
 }
 
@@ -485,7 +512,7 @@ pub enum ManifestError {
 }
 
 impl ToResponse for ManifestError {
-    fn to_response(&self) -> Envelope {
+    fn to_response(&mut self) -> Envelope {
         let status = match self {
             ManifestError::NotFound => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
@@ -496,7 +523,7 @@ impl ToResponse for ManifestError {
 }
 
 impl <A, B>ToResponse for Result<A, B> where A: ToResponse, B: ToResponse {
-    fn to_response(&self) -> Envelope {
+    fn to_response(&mut self) -> Envelope {
         match self {
             Ok(a) => a.to_response(),
             Err(b) => b.to_response(),

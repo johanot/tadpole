@@ -85,7 +85,7 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
 
         Ok(Blob{
             info,
-            body: buffer.into(),
+            body: Some(buffer.into()),
         })
     }
 
