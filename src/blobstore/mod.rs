@@ -1,4 +1,5 @@
 pub mod filesystem;
+//pub mod s3;
 
 use async_trait::async_trait;
 use std::error::Error;
@@ -7,7 +8,15 @@ use std::io::Read;
 use std::convert::Into;
 
 
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct S3BlobStoreConfig {
+    
+}
 
+pub struct S3BlobStore {
+    
+}
 
 
 use crate::types::ContentType;
@@ -26,13 +35,14 @@ pub trait BlobStore<C> {
         Self: Sized;
     fn stat<S: Into<BlobSpec>>(&self, spec: S) -> Result<BlobInfo, BlobError>;
     fn get<S: Into<BlobSpec>>(&self, spec: S) -> Result<Blob, BlobError>;
+    fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError>;
     fn start_upload(&self) -> Result<UploadID, BlobError>;
     async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError>;
     async fn complete_upload(
         &self,
         upload_id: &UploadID,
-        digest: &Digest,
-    ) -> Result<Digest, BlobError>;
+        input_digest: &Digest
+    ) -> Result<(), BlobError>;
 }
 
 pub trait ToBlobStore<T> {

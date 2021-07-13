@@ -145,7 +145,6 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     let complete_upload = warp::put()
         .and(path!("v2" / String / "blobs" / "stream" / String))
         .and(headers)
-        .and(warp::query())
         .and(warp::query::<MonolithicUpload>())
         .and(warp::filters::body::bytes())
         .and_then(complete_upload)
@@ -335,7 +334,6 @@ async fn complete_upload(
     name: String,
     uuid: String,
     _headers: HeaderMap,
-    _mu: MonolithicUpload,
     mu: MonolithicUpload,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
@@ -352,10 +350,23 @@ async fn complete_upload(
         blob_store.patch(&uuid, input).await.unwrap();
     }
     use std::str::FromStr;
+
+    let input_digest = Digest::from_str(&mu.digest.as_ref().unwrap()).unwrap();
+    let store_digest = blob_store.get_upload_digest(&uuid).unwrap();
+
+    log::info(&format!(
+        "hash comparison: {:?}, {:?}",
+        &store_digest, &input_digest
+    ));
+
+    if input_digest != store_digest {
+        panic!("hash mismatch");
+    }
+
     let _total = blob_store
         .complete_upload(
             &uuid,
-            &Digest::from_str(&mu.digest.as_ref().unwrap()).unwrap(),
+            &input_digest
         )
         .await
         .unwrap();
@@ -393,7 +404,7 @@ async fn put_manifests(
 
     let upload_id = blob_store.start_upload().unwrap();
     blob_store.patch(&upload_id, input).await.unwrap();
-    let digest = blob_store
+    blob_store
         .complete_upload(&upload_id, &digest)
         .await
         .unwrap();

@@ -2,6 +2,7 @@ use reqwest::header::HeaderValue;
 use sha2::Digest as Sha2Digest;
 use sha2::Sha256;
 use std::str::FromStr;
+use std::io::BufRead;
 
 use warp::hyper::body::Bytes;
 
@@ -70,6 +71,26 @@ impl Digest {
             algo,
             value: hasher.finalize().to_vec(),
         }
+    }
+
+    pub fn from_reader<T: BufRead>(mut reader: T) -> Result<Self, DigestParseError> {
+        //TODO: hardcoded until further algorithms are support, consider generifying then
+        let algo = DigestAlgo::Sha256;
+        let mut hasher = Sha256::new();
+        loop {
+            let buffer = reader.fill_buf().unwrap();
+            let buf_len = buffer.len();
+            if buf_len > 0 {
+                hasher.update(buffer);
+                reader.consume(buf_len);
+            } else {
+                break;
+            }
+        }
+        Ok(Self {
+            algo,
+            value: hasher.finalize().to_vec(),
+        })
     }
 }
 

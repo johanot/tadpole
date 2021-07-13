@@ -1,8 +1,6 @@
 use crate::blobstore::{Blob, BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
 use crate::log;
 use async_trait::async_trait;
-use sha2::Digest;
-use sha2::Sha256;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -13,7 +11,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 
-use crate::types::{ContentType, Digest as TadpoleDigest, DigestAlgo};
+use crate::types::{ContentType, Digest, DigestAlgo};
 
 
 
@@ -129,47 +127,26 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
         }
     }
 
+
+    fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError> {
+        let full_path = self.config.store_path.join(&upload_id);
+        let file = File::open(&full_path).unwrap();
+        Digest::from_reader(BufReader::with_capacity(8 * 1024 * 1024, file)).map_err(|_| BlobError::HashMismatch) //TODO: map to different error
+    }
+
     async fn complete_upload(
         &self,
         upload_id: &UploadID,
-        input_digest: &TadpoleDigest,
-    ) -> Result<TadpoleDigest, BlobError> {
+        input_digest: &Digest
+    ) -> Result<(), BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let final_path = self
             .config
             .store_path
             .join(&input_digest.to_typefixed_string());
 
-        let check_digest = {
-            let file = File::open(&full_path).unwrap();
-            let mut hasher = Sha256::new();
-            let mut br = BufReader::with_capacity(8 * 1024 * 1024, file);
-            loop {
-                let buffer = br.fill_buf().unwrap();
-                let buf_len = buffer.len();
-                if buf_len > 0 {
-                    hasher.update(buffer);
-                    br.consume(buf_len);
-                } else {
-                    break;
-                }
-            }
-            TadpoleDigest {
-                algo: DigestAlgo::Sha256,
-                value: hasher.finalize().to_vec(),
-            }
-        };
-
-        log::info(&format!(
-            "hash comparison: {:?}, {:?}",
-            &check_digest, &input_digest
-        ));
-
-        if &check_digest == input_digest {
-            std::fs::rename(&full_path, &final_path).unwrap();
-            Ok(check_digest)
-        } else {
-            Err(BlobError::HashMismatch)
-        }
+        
+        std::fs::rename(&full_path, &final_path).unwrap();
+        Ok(())
     }
 }
