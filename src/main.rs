@@ -179,16 +179,16 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .map(start_upload_blob);
     let head_blob = warp::head()
         .and(path!("v2" / String / "blobs" / Digest))
-        .map(head_blob);
+        .and_then(head_blob);
     let get_blob = warp::get()
         .and(path!("v2" / String / "blobs" / Digest))
-        .map(get_blob);
+        .and_then(get_blob);
     let head_manifests = warp::head()
         .and(path!("v2" / String / "manifests" / ImageRef))
-        .map(head_manifests);
+        .and_then(head_manifests);
     let get_manifests = warp::get()
         .and(path!("v2" / String / "manifests" / ImageRef))
-        .map(get_manifests);
+        .and_then(get_manifests);
 
     let routes = version_check
         .or(start_upload_blob)
@@ -214,7 +214,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     tokio::task::spawn(server);
 }
 
-fn head_blob(repo: String, digest: Digest) -> impl warp::Reply {
+async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
     let blob_store: FileSystemBlobStore = config
         .blob_store
@@ -225,7 +225,7 @@ fn head_blob(repo: String, digest: Digest) -> impl warp::Reply {
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
 
-    let builder = match blob_store.stat(BlobSpec { digest }) {
+    let builder = match blob_store.stat(BlobSpec { digest }).await {
         Ok(info) => builder
             .status(StatusCode::OK)
             .header("Content-Length", info.size.to_string())
@@ -234,10 +234,10 @@ fn head_blob(repo: String, digest: Digest) -> impl warp::Reply {
         Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    builder.body("")
+    Ok(builder.body(""))
 }
 
-fn get_blob(repo: String, digest: Digest) -> impl warp::Reply {
+async fn get_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
     let blob_store: FileSystemBlobStore = config
         .blob_store
@@ -248,7 +248,7 @@ fn get_blob(repo: String, digest: Digest) -> impl warp::Reply {
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
 
-    match blob_store.get(BlobSpec { digest }) {
+    Ok(match blob_store.get(BlobSpec { digest }).await {
         Ok(mut blob) => builder
             .status(StatusCode::OK)
             .header("Content-Length", blob.info.size.to_string())
@@ -256,7 +256,7 @@ fn get_blob(repo: String, digest: Digest) -> impl warp::Reply {
             .body(blob.body.take().unwrap()),
         Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body("".into()),
         Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body("".into()),
-    }
+    })
 }
 
 fn start_upload_blob(name: String) -> impl warp::Reply {
@@ -450,7 +450,7 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
         .body("")
 }
 
-fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError> {
+async fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError> {
     let config = Config::get();
 
     let metadata_store: FileSystemMetadataStore = config
@@ -467,26 +467,24 @@ fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError> {
         .unwrap()
         .to_blob_store();
   
-    metadata_store
-        .read_spec(&ManifestSpec{
-            name: name.clone(),
-            reference: tag.clone(),
-        }).map_err(std::convert::Into::<ManifestError>::into)
-        .and_then(|digest| blob_store.get(BlobSpec{
-            digest: digest.clone(),
-        }).map_err(std::convert::Into::<ManifestError>::into))
+    let digest = metadata_store.read_spec(&ManifestSpec{
+        name: name.clone(),
+        reference: tag.clone(),
+    }).map_err(std::convert::Into::<ManifestError>::into)?;
+
+    blob_store.get(BlobSpec{ digest: digest.clone() }).await.map_err(std::convert::Into::<ManifestError>::into)
 }
 
-fn head_manifests(name: String, tag: ImageRef) -> impl warp::Reply {
-    manifest(name, tag)
+async fn head_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
+    Ok(manifest(name, tag).await
         .to_response()
-        .empty()
+        .empty())
 }
 
-fn get_manifests(name: String, tag: ImageRef) -> impl warp::Reply {
-    manifest(name, tag)
+async fn get_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
+    Ok(manifest(name, tag).await
         .to_response()
-        .emit()
+        .emit())
 }
 
 use warp::http::response::Builder;

@@ -49,7 +49,7 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
         Ok(Self { config })
     }
 
-    fn stat<S: Into<BlobSpec>>(&self, spec: S) -> Result<BlobInfo, BlobError> {
+    async fn stat<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<BlobInfo, BlobError> {
         let spec: BlobSpec = spec.into();
         
         let full_path = self
@@ -65,17 +65,21 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
                     content_type: ContentType::OctetStream,
                     size: fs_meta.len(),
                     digest: spec.digest.clone(),
-                    path: full_path.clone(),
                 })
             }
             false => Err(BlobError::NotFound),
         }
     }
 
-    fn get<S: Into<BlobSpec>>(&self, spec: S) -> Result<Blob, BlobError> {
-        let info = self.stat(spec)?;
+    async fn get<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<Blob, BlobError> {
+        let info = self.stat(spec).await?;
 
-        let mut f = File::open(&info.path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
+        let full_path = self
+            .config
+            .store_path
+            .join(&info.digest.to_typefixed_string());
+
+        let mut f = File::open(&full_path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
         let mut buffer = Vec::with_capacity(info.size as usize);
     
         //TODO: stream instead of buffering entire blob to memory

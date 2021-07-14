@@ -1,23 +1,11 @@
 pub mod filesystem;
-//pub mod s3;
+pub mod s3;
 
 use async_trait::async_trait;
 use std::error::Error;
 
 use std::io::Read;
 use std::convert::Into;
-
-
-#[derive(Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct S3BlobStoreConfig {
-    
-}
-
-pub struct S3BlobStore {
-    
-}
-
 
 use crate::types::ContentType;
 use crate::types::Digest;
@@ -33,8 +21,8 @@ pub trait BlobStore<C> {
     fn init(config: C) -> Result<Self, BlobError>
     where
         Self: Sized;
-    fn stat<S: Into<BlobSpec>>(&self, spec: S) -> Result<BlobInfo, BlobError>;
-    fn get<S: Into<BlobSpec>>(&self, spec: S) -> Result<Blob, BlobError>;
+    async fn stat<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<BlobInfo, BlobError>;
+    async fn get<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<Blob, BlobError>;
     fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError>;
     fn start_upload(&self) -> Result<UploadID, BlobError>;
     async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError>;
@@ -59,7 +47,6 @@ pub struct BlobInfo {
     pub content_type: ContentType,
     pub digest: Digest,
     pub size: u64,
-    pub path: PathBuf,
 }
 
 pub struct Blob {
