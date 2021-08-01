@@ -36,7 +36,6 @@ pub struct ManifestSpec {
     pub reference: ImageRef,
 }
 
-//short circuit (for now)
 pub type Manifest = Blob;
 
 #[derive(Clone, Debug)]

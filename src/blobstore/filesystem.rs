@@ -1,23 +1,20 @@
-use crate::blobstore::{Blob, BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
+use crate::blobstore::{BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
 use crate::log;
 use async_trait::async_trait;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::marker::Send;
+use crate::blobstore::Blob;
 
 use std::path::PathBuf;
 use uuid::Uuid;
 
 
 use crate::types::{ContentType, Digest, DigestAlgo};
-
-
-
-use std::io::Write;
-
-
 
 use warp::hyper::body::Bytes;
 
@@ -41,16 +38,18 @@ impl ToBlobStore<FileSystemBlobStore> for FileSystemBlobStoreConfig {
     }
 }
 
-#[async_trait]
-impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
+impl FileSystemBlobStore {
     fn init(config: FileSystemBlobStoreConfig) -> Result<Self, BlobError> {
         fs::create_dir_all(&config.store_path)
             .map_err(|e| BlobError::Other { inner: Box::new(e) })?;
         Ok(Self { config })
     }
+}
 
-    async fn stat<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<BlobInfo, BlobError> {
-        let spec: BlobSpec = spec.into();
+#[async_trait]
+impl BlobStore for FileSystemBlobStore {
+    async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError> {
+        //let spec: BlobSpec = spec.into();
         
         let full_path = self
             .config
@@ -71,7 +70,7 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
         }
     }
 
-    async fn get<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<Blob, BlobError> {
+    async fn get(&self, spec: BlobSpec) -> Result<Blob, BlobError> {
         let info = self.stat(spec).await?;
 
         let full_path = self
@@ -79,19 +78,18 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
             .store_path
             .join(&info.digest.to_typefixed_string());
 
-        let mut f = File::open(&full_path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
-        let mut buffer = Vec::with_capacity(info.size as usize);
-    
-        //TODO: stream instead of buffering entire blob to memory
-        f.read_to_end(&mut buffer).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
+        let f = File::open(&full_path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
 
+        //TODO: stream instead of buffering entire blob to memory
+        //f.read_to_end(&mut buffer).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
+        use crate::blobstore::reader_to_stream;
         Ok(Blob{
             info,
-            body: Some(buffer.into()),
+            stream: reader_to_stream(BufReader::new(f))
         })
     }
 
-    fn start_upload(&self) -> Result<UploadID, BlobError> {
+    async fn start_upload(&self) -> Result<UploadID, BlobError> {
         let uuid = Uuid::new_v4();
         let full_path = PathBuf::from("blobstore").join(&uuid.to_string());
 
@@ -115,8 +113,8 @@ impl BlobStore<FileSystemBlobStoreConfig> for FileSystemBlobStore {
 
         let len = file.metadata().unwrap().len();
         if !input.is_empty() {
-            let mut writer = BufWriter::with_capacity(1024 * 1024, &mut file);
-            let mut reader = BufReader::with_capacity(1024 * 1024, &*input);
+            let mut writer = BufWriter::with_capacity(4096, &mut file);
+            let mut reader = BufReader::with_capacity(4096, &*input);
 
             let written = std::io::copy(&mut reader, &mut writer).unwrap();
 

@@ -2,10 +2,14 @@
 use s3::{Bucket, Region, S3Error};
 use s3::creds::Credentials;
 use async_trait::async_trait;
-use crate::blobstore::{Blob, BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
+use crate::blobstore::{BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
 use crate::types::{ContentType, Digest, DigestAlgo};
 use hyper::body::Bytes;
 use serde::de::{self, Deserialize, Deserializer};
+use std::marker::Send;
+use std::io::Write;
+use crate::blobstore::Blob;
+use crate::blobstore::StreamWriter;
 
 #[derive(Deserialize, Debug)]
 struct CredentialsHelper {
@@ -30,7 +34,7 @@ where
     Region::from_str(&region).map_err(de::Error::custom)
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3BlobStoreConfig {
     bucket_name: String,
@@ -52,15 +56,23 @@ impl std::convert::From<S3Error> for BlobError {
     }
 }
 
-#[async_trait]
-impl BlobStore<S3BlobStoreConfig> for S3BlobStore {
+impl ToBlobStore<S3BlobStore> for S3BlobStoreConfig {
+    fn to_blob_store(&self) -> S3BlobStore {
+        S3BlobStore::init(self.clone()).unwrap()
+    }
+}
+
+impl S3BlobStore {
     fn init(config: S3BlobStoreConfig) -> Result<Self, BlobError> {
         Ok(S3BlobStore{
             bucket: Bucket::new(&config.bucket_name, config.region.clone(), config.credentials.clone())?
         })
     }
+}
 
-    async fn stat<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<BlobInfo, BlobError> {
+#[async_trait]
+impl BlobStore for S3BlobStore {
+    async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError> {
         let spec: BlobSpec = spec.into();
         match self.bucket.head_object(&spec.digest.to_typefixed_string()).await {
             Ok((obj, _)) => Ok(BlobInfo{
@@ -74,12 +86,20 @@ impl BlobStore<S3BlobStoreConfig> for S3BlobStore {
         }
     }
 
-    async fn get<S: Into<BlobSpec> + std::marker::Send>(&self, spec: S) -> Result<Blob, BlobError> {
-        let spec: BlobSpec = spec.into();
-        Err(BlobError::NotFound)
+    async fn get(&self, spec: BlobSpec) -> Result<Blob, BlobError> {
+        let info = self.stat(spec).await?;
+        
+        let mut writer = StreamWriter::new();
+        let status_code = self.bucket.get_object_stream(&info.digest.to_typefixed_string(), &mut writer).await?;
+        
+        use crate::blobstore::writer_to_stream;
+        Ok(Blob{
+            info,
+            stream: writer_to_stream(writer)
+        })
     }
 
-    fn start_upload(&self) -> Result<UploadID, BlobError> {
+    async fn start_upload(&self) -> Result<UploadID, BlobError> {
         Err(BlobError::NotFound)
     }
 

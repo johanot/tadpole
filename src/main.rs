@@ -36,6 +36,8 @@ use serde_json::json;
 use warp::http::{Response, StatusCode};
 use warp::log::Info;
 use warp::path;
+use std::io::BufWriter;
+
 
 mod blobstore;
 mod metadatastore;
@@ -176,7 +178,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
 
     let start_upload_blob = warp::post()
         .and(path!("v2" / String / "blobs" / "uploads"))
-        .map(start_upload_blob);
+        .and_then(start_upload_blob);
     let head_blob = warp::head()
         .and(path!("v2" / String / "blobs" / Digest))
         .and_then(head_blob);
@@ -214,14 +216,18 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     tokio::task::spawn(server);
 }
 
+use crate::config::BlobStoreConfig;
+
+fn get_blob_store() -> Box<dyn BlobStore> {
+    match &Config::get().blob_store {
+        BlobStoreConfig::FileSystem(c) => Box::new(c.to_blob_store()),
+        BlobStoreConfig::S3(c) => Box::new(c.to_blob_store()),
+    }
+}
+
 async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
 
@@ -237,29 +243,31 @@ async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Inf
     Ok(builder.body(""))
 }
 
+use futures::stream;
+use futures::TryStreamExt;
+use crate::blobstore::empty_stream;
+
+
 async fn get_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
-
+    
     Ok(match blob_store.get(BlobSpec { digest }).await {
-        Ok(mut blob) => builder
+        Ok(blob) => {
+            builder
             .status(StatusCode::OK)
             .header("Content-Length", blob.info.size.to_string())
             .header("Content-Type", blob.info.content_type)
-            .body(blob.body.take().unwrap()),
-        Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body("".into()),
-        Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body("".into()),
+            .body(blob.stream).unwrap()
+        },
+        Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body(empty_stream()).unwrap(),
+        Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body(empty_stream()).unwrap(),
     })
 }
 
-fn start_upload_blob(name: String) -> impl warp::Reply {
+async fn start_upload_blob(name: String) -> Result<impl warp::Reply, Infallible> {
     /*
         202 Accepted
         Location: /v2/<name>/blobs/uploads/<uuid>
@@ -268,17 +276,12 @@ fn start_upload_blob(name: String) -> impl warp::Reply {
         Docker-Upload-UUID: <uuid>
     */
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
-    let upload_id = blob_store.start_upload().unwrap();
+    let upload_id = blob_store.start_upload().await.unwrap();
     let uid_str = upload_id.to_string();
 
-    Response::builder()
+    Ok(Response::builder()
         .header(
             "Location",
             format!(
@@ -292,7 +295,7 @@ fn start_upload_blob(name: String) -> impl warp::Reply {
         .header("Docker-Distribution-API-Version", "registry/v2.0")
         .header("Docker-Upload-UUID", &uid_str)
         .status(StatusCode::ACCEPTED)
-        .body("")
+        .body(""))
 }
 
 use futures::stream::StreamExt;
@@ -309,12 +312,7 @@ async fn patch_upload(
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
     let total = blob_store.patch(&uuid, input).await.unwrap();
 
@@ -338,12 +336,7 @@ async fn complete_upload(
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
     if !input.is_empty() {
         log::info("Additional bytes to write in the complete_upload step");
@@ -393,16 +386,11 @@ async fn put_manifests(
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
 
     let digest = Digest::from_bytes(&input);
 
-    let upload_id = blob_store.start_upload().unwrap();
+    let upload_id = blob_store.start_upload().await.unwrap();
     blob_store.patch(&upload_id, input).await.unwrap();
     blob_store
         .complete_upload(&upload_id, &digest)
@@ -460,12 +448,7 @@ async fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError
         .unwrap()
         .to_metadata_store();
   
-    let blob_store: FileSystemBlobStore = config
-        .blob_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_blob_store();
+    let blob_store = get_blob_store();
   
     let digest = metadata_store.read_spec(&ManifestSpec{
         name: name.clone(),
@@ -509,7 +492,7 @@ impl ToResponse for Manifest {
 
         Envelope {
             builder: Some(builder),
-            body: self.body.take(),
+            body: None, //TODO
         }
     }
 }
