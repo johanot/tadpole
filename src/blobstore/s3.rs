@@ -1,5 +1,5 @@
 
-use s3::{Bucket, Region, S3Error};
+use s3::{Bucket, Region};
 use s3::creds::Credentials;
 use async_trait::async_trait;
 use crate::blobstore::{BlobError, BlobInfo, BlobSpec, BlobStore, ToBlobStore, UploadID};
@@ -10,6 +10,12 @@ use std::marker::Send;
 use std::io::Write;
 use crate::blobstore::Blob;
 use crate::blobstore::StreamWriter;
+use crate::blobstore::UploadData;
+use s3::serde_types::InitiateMultipartUploadResponse;
+use dbc_rust_modules::log;
+
+use uuid::Uuid;
+use futures::StreamExt;
 
 #[derive(Deserialize, Debug)]
 struct CredentialsHelper {
@@ -48,10 +54,19 @@ pub struct S3BlobStore {
     bucket: Bucket,
 }
 
-impl std::convert::From<S3Error> for BlobError {
-    fn from(err: S3Error) -> Self {
+impl std::convert::From<anyhow::Error> for BlobError {
+    fn from(err: anyhow::Error) -> Self {
         Self::Other{
             inner: Box::new(err)
+        }
+    }
+}
+
+impl std::convert::From<InitiateMultipartUploadResponse> for UploadData {
+    fn from(response: InitiateMultipartUploadResponse) -> Self {
+        Self{
+            upload_id: response.upload_id,
+            path: response.key,
         }
     }
 }
@@ -64,43 +79,49 @@ impl ToBlobStore<S3BlobStore> for S3BlobStoreConfig {
 
 impl S3BlobStore {
     fn init(config: S3BlobStoreConfig) -> Result<Self, BlobError> {
+        let bucket = Bucket::new(&config.bucket_name, config.region.clone(), config.credentials.clone())?;
         Ok(S3BlobStore{
-            bucket: Bucket::new(&config.bucket_name, config.region.clone(), config.credentials.clone())?
+            bucket
         })
     }
+}
+
+fn gimme(bucket: Bucket, info: BlobInfo, mut writer: StreamWriter) {
+    tokio::spawn(async move {
+        bucket.get_object_stream(&info.digest.to_typefixed_string(), &mut writer).await.unwrap();
+    });
 }
 
 #[async_trait]
 impl BlobStore for S3BlobStore {
     async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError> {
         let spec: BlobSpec = spec.into();
-        match self.bucket.head_object(&spec.digest.to_typefixed_string()).await {
-            Ok((obj, _)) => Ok(BlobInfo{
+        let res = self.bucket.head_object(&spec.digest.to_typefixed_string()).await;
+        log::info(&format!("{:?}", &res));
+        match res {
+            Ok((_, 404)) => Err(BlobError::NotFound),
+            Ok((obj, 200)) => Ok(BlobInfo{
                 content_type: ContentType::OctetStream, //hardcoded for now
                 digest: spec.digest.clone(),
                 size: obj.content_length.unwrap() as u64,
-
             }),
-            Ok((_, 404)) => Err(BlobError::NotFound),
+            Ok((_, code)) => Err(BlobError::Other { inner: Box::new(format!("unknown http response code from s3: {}", code)) }),
             Err(e) => Err(BlobError::Other { inner: Box::new(e) }),
         }
     }
 
-    async fn get(&self, spec: BlobSpec) -> Result<Blob, BlobError> {
-        let info = self.stat(spec).await?;
+    async fn get(&self, spec: BlobSpec, mut writer: StreamWriter) -> Result<BlobInfo, BlobError> {
+        let info = self.stat(spec).await?;    
+        log::data("info", &format!("{:?}", &info));    
         
-        let mut writer = StreamWriter::new();
-        let status_code = self.bucket.get_object_stream(&info.digest.to_typefixed_string(), &mut writer).await?;
-        
-        use crate::blobstore::writer_to_stream;
-        Ok(Blob{
-            info,
-            stream: writer_to_stream(writer)
-        })
+        gimme(self.bucket.clone(), info.clone(), writer);
+
+        Ok(info)
     }
 
-    async fn start_upload(&self) -> Result<UploadID, BlobError> {
-        Err(BlobError::NotFound)
+    async fn start_upload(&self) -> Result<UploadData, BlobError> {
+        let uuid = Uuid::new_v4();
+        Ok(self.bucket.initiate_multipart_upload(&uuid.to_string()).await.map(|r| r.into())?)
     }
 
     async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError> {

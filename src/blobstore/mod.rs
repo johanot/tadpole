@@ -23,12 +23,17 @@ use warp::hyper::body::Bytes;
 
 type UploadID = String;
 
+pub struct UploadData {
+    pub upload_id: String,
+    pub path: String,
+}
+
 #[async_trait]
 pub trait BlobStore: Send + Sync {
     async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError>;
-    async fn get(&self, spec: BlobSpec) -> Result<Blob, BlobError>;
+    async fn get(&self, spec: BlobSpec, sw: StreamWriter) -> Result<BlobInfo, BlobError>;
     fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError>;
-    async fn start_upload(&self) -> Result<UploadID, BlobError>;
+    async fn start_upload(&self) -> Result<UploadData, BlobError>;
     async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError>;
     async fn complete_upload(
         &self,
@@ -46,7 +51,7 @@ pub struct BlobSpec {
     pub digest: Digest,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct BlobInfo {
     pub content_type: ContentType,
     pub digest: Digest,
@@ -67,20 +72,55 @@ use futures::stream::{self, StreamExt};
 
 type StreamItemResult = Result<Bytes, Box<(dyn Error + Send + Sync + 'static)>>;
 type StreamPollResult = Poll<Option<StreamItemResult>>;
+use hyper::body::Sender;
 
-pub struct StreamWriter(VecDeque<StreamItemResult>);
-use std::collections::VecDeque;
+pub enum StreamWriter {
+    Streamed(Sender),
+    Dummy,
+}
+
 
 impl StreamWriter {
-    fn new() -> Self {
-        Self(VecDeque::new())
+    pub fn new(sender: Sender) -> Self {
+        Self::Streamed(sender)
+    }
+    pub fn new_dummy() -> Self {
+        Self::Dummy
+    }
+    pub fn write_sync(&mut self, bytes: Bytes) -> Result<(), hyper::body::Bytes> {
+        match self {
+            StreamWriter::Streamed(s) => s.try_send_data(bytes),
+            StreamWriter::Dummy => Ok(()),
+        }
+    }
+    pub async fn write_async(&mut self, bytes: Bytes) -> Result<(), hyper::Error> {
+        match self {
+            StreamWriter::Streamed(s) => s.send_data(bytes).await,
+            StreamWriter::Dummy => Ok(()),
+        }
     }
 }
 
 impl Write for StreamWriter {
     fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
         let len = buf.len();
-        self.0.push_back(Ok(Bytes::copy_from_slice(buf)));
+        let mut bytes = Bytes::copy_from_slice(buf);
+        use std::{thread, time};
+        let ten_millis = time::Duration::from_micros(100);
+        let mut attempts = 0;
+        loop {
+            match self.write_sync(bytes) {
+                Ok(_) => { break; }
+                Err(b) => { bytes = b;  }
+            }
+            attempts = attempts + 1;
+            if attempts > 30000 {
+                log::info("failed sending chunk");
+                break;
+            }
+            thread::sleep(ten_millis);
+        }
+        //log::info("succeeded flushing");
         Ok(len)
     }
     fn flush(&mut self) -> Result<(), std::io::Error> {
@@ -88,33 +128,37 @@ impl Write for StreamWriter {
     }
 }
 
-pub fn writer_to_stream(mut writer: StreamWriter) -> BlobStream {
-    let stream = poll_fn(move |_| -> StreamPollResult {
-        Poll::Ready(writer.0.pop_front())
-    });
-    Box::new(stream)
-}
-
-pub fn reader_to_stream<R: 'static + Read + Send + Sync>(mut reader: BufReader<R>) -> BlobStream {
-    let stream = poll_fn(move |_| -> StreamPollResult {
-        match reader.fill_buf() {
-            Ok(c) => {
-                let size = c.len();
-                if size > 0 {
-                    let res = Poll::Ready(Some(Ok(Bytes::copy_from_slice(c))));
-                    reader.consume(size);
-                    res
-                } else {
-                    Poll::Ready(None)
+use std::path::Path;
+use std::fs::File;
+pub fn file_to_writer(full_path: PathBuf, mut sw: StreamWriter) {
+    tokio::spawn(async move {
+        let f = File::open(&full_path).unwrap();
+        let mut reader = BufReader::new(f);
+        log::info("time to buffer");
+        let mut chunks = 0;
+        loop {
+            chunks = chunks + 1;
+            let buf_ = reader.fill_buf();
+            match buf_ {
+                Ok(buf) => {
+                    let size = buf.len();
+                    //
+                    use std::{thread, time};
+                    if size > 0 {
+                        if match sw.write_async(Bytes::copy_from_slice(buf)).await {
+                            Ok(_) => { reader.consume(size); Ok(false) },
+                            Err(e) => Err(e),
+                        }.unwrap() { break; }
+                    } else {
+                        break;
+                    }
+                },
+                Err(e) => {
+                    log::error("failed to read from buffer", &e);
                 }
-            },
-            Err(e) => {
-                log::error("failed to read from buffer", &e);
-                Poll::Ready(None)
             }
         }
     });
-    Box::new(stream)
 }
 
 pub fn empty_stream() -> BlobStream {

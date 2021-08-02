@@ -26,6 +26,7 @@ use crate::config::MetadataStoreConfig;
 use crate::types::Digest;
 
 use warp::hyper::body::Bytes;
+use crate::blobstore::BlobInfo;
 
 use std::thread;
 use std::time::Duration;
@@ -235,7 +236,7 @@ async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Inf
         Ok(info) => builder
             .status(StatusCode::OK)
             .header("Content-Length", info.size.to_string())
-            .header("Content-Type", info.content_type),
+            .header("Content-Type", &info.content_type),
         Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND),
         Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR),
     };
@@ -246,7 +247,7 @@ async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Inf
 use futures::stream;
 use futures::TryStreamExt;
 use crate::blobstore::empty_stream;
-
+use crate::blobstore::StreamWriter;
 
 async fn get_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
@@ -254,16 +255,19 @@ async fn get_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infa
 
     let builder = Response::builder().header("Docker-Distribution-API-Version", "registry/v2.0");
     
-    Ok(match blob_store.get(BlobSpec { digest }).await {
-        Ok(blob) => {
+    let (sender, body) = hyper::body::Body::channel();
+    let blob_info = blob_store.get(BlobSpec { digest }, StreamWriter::new(sender)).await;
+    Ok(match &blob_info {
+        Ok(info) => {
+            log::data("blob info", &info);
             builder
             .status(StatusCode::OK)
-            .header("Content-Length", blob.info.size.to_string())
-            .header("Content-Type", blob.info.content_type)
-            .body(blob.stream).unwrap()
+            .header("Content-Length", info.size.to_string())
+            .header("Content-Type", &info.content_type)
+            .body(body).unwrap()
         },
-        Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body(empty_stream()).unwrap(),
-        Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body(empty_stream()).unwrap(),
+        Err(BlobError::NotFound) => builder.status(StatusCode::NOT_FOUND).body(hyper::Body::empty()).unwrap(),
+        Err(_) => builder.status(StatusCode::INTERNAL_SERVER_ERROR).body(hyper::Body::empty()).unwrap(),
     })
 }
 
@@ -278,8 +282,8 @@ async fn start_upload_blob(name: String) -> Result<impl warp::Reply, Infallible>
     let config = Config::get();
     let blob_store = get_blob_store();
 
-    let upload_id = blob_store.start_upload().await.unwrap();
-    let uid_str = upload_id.to_string();
+    let res = blob_store.start_upload().await.unwrap();
+    let uid_str = res.upload_id.to_string();
 
     Ok(Response::builder()
         .header(
@@ -390,10 +394,10 @@ async fn put_manifests(
 
     let digest = Digest::from_bytes(&input);
 
-    let upload_id = blob_store.start_upload().await.unwrap();
-    blob_store.patch(&upload_id, input).await.unwrap();
+    let res = blob_store.start_upload().await.unwrap();
+    blob_store.patch(&res.upload_id, input).await.unwrap();
     blob_store
-        .complete_upload(&upload_id, &digest)
+        .complete_upload(&res.upload_id, &digest)
         .await
         .unwrap();
 
@@ -438,7 +442,7 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
         .body("")
 }
 
-async fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError> {
+async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, ManifestError> {
     let config = Config::get();
 
     let metadata_store: FileSystemMetadataStore = config
@@ -449,23 +453,35 @@ async fn manifest(name: String, tag: ImageRef) -> Result<Manifest, ManifestError
         .to_metadata_store();
   
     let blob_store = get_blob_store();
-  
+    let (sw, body) = {
+        if head {
+            (StreamWriter::new_dummy(), hyper::body::Body::empty())
+        } else {
+            let (sender, body) = hyper::body::Body::channel();
+            (StreamWriter::new(sender), body)
+        }
+    };
+
     let digest = metadata_store.read_spec(&ManifestSpec{
         name: name.clone(),
         reference: tag.clone(),
     }).map_err(std::convert::Into::<ManifestError>::into)?;
 
-    blob_store.get(BlobSpec{ digest: digest.clone() }).await.map_err(std::convert::Into::<ManifestError>::into)
+    let info = blob_store.get(BlobSpec{ digest: digest.clone() }, sw).await.map_err(std::convert::Into::<ManifestError>::into).unwrap();
+    Ok(Manifest{
+        info,
+        body,
+    })
 }
 
 async fn head_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
-    Ok(manifest(name, tag).await
+    Ok(manifest(name, tag, true).await
         .to_response()
         .empty())
 }
 
 async fn get_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
-    Ok(manifest(name, tag).await
+    Ok(manifest(name, tag, false).await
         .to_response()
         .emit())
 }
@@ -478,11 +494,11 @@ fn registry_response() -> Builder {
 }
 
 trait ToResponse {
-    fn to_response(&mut self) -> Envelope;
+    fn to_response(self) -> Envelope;
 }
 
 impl ToResponse for Manifest {
-    fn to_response(&mut self) -> Envelope {
+    fn to_response(self) -> Envelope {
 
         let builder = registry_response()
             .status(StatusCode::OK)
@@ -492,7 +508,7 @@ impl ToResponse for Manifest {
 
         Envelope {
             builder: Some(builder),
-            body: None, //TODO
+            body: Some(self.body),
         }
     }
 }
@@ -504,7 +520,7 @@ pub enum ManifestError {
 }
 
 impl ToResponse for ManifestError {
-    fn to_response(&mut self) -> Envelope {
+    fn to_response(self) -> Envelope {
         let status = match self {
             ManifestError::NotFound => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
@@ -515,7 +531,7 @@ impl ToResponse for ManifestError {
 }
 
 impl <A, B>ToResponse for Result<A, B> where A: ToResponse, B: ToResponse {
-    fn to_response(&mut self) -> Envelope {
+    fn to_response(self) -> Envelope {
         match self {
             Ok(a) => a.to_response(),
             Err(b) => b.to_response(),

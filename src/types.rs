@@ -6,18 +6,18 @@ use std::io::BufRead;
 
 use warp::hyper::body::Bytes;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum ContentType {
     OctetStream,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Digest {
     pub algo: DigestAlgo,
     pub value: Vec<u8>,
 }
 
-#[derive(Clone, Debug, strum::ToString, strum::EnumString, PartialEq)]
+#[derive(Clone, Debug, strum::ToString, strum::EnumString, PartialEq, Serialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum DigestAlgo {
     Sha256,
@@ -35,8 +35,8 @@ impl Default for DigestAlgo {
     }
 }
 
-impl std::convert::From<ContentType> for HeaderValue {
-    fn from(content_type: ContentType) -> Self {
+impl std::convert::From<&ContentType> for HeaderValue {
+    fn from(content_type: &ContentType) -> Self {
         Self::from_static(match content_type {
             ContentType::OctetStream => "application/octet-stream",
         })

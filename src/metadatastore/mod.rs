@@ -36,7 +36,12 @@ pub struct ManifestSpec {
     pub reference: ImageRef,
 }
 
-pub type Manifest = Blob;
+use crate::BlobInfo;
+
+pub struct Manifest {
+    pub info: BlobInfo,
+    pub body: hyper::body::Body,
+}
 
 #[derive(Clone, Debug)]
 pub enum ImageRef {

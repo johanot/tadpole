@@ -9,9 +9,11 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::marker::Send;
 use crate::blobstore::Blob;
+use crate::blobstore::UploadData;
 
 use std::path::PathBuf;
 use uuid::Uuid;
+use crate::blobstore::StreamWriter;
 
 
 use crate::types::{ContentType, Digest, DigestAlgo};
@@ -70,7 +72,7 @@ impl BlobStore for FileSystemBlobStore {
         }
     }
 
-    async fn get(&self, spec: BlobSpec) -> Result<Blob, BlobError> {
+    async fn get(&self, spec: BlobSpec, writer: StreamWriter) -> Result<BlobInfo, BlobError> {
         let info = self.stat(spec).await?;
 
         let full_path = self
@@ -78,18 +80,15 @@ impl BlobStore for FileSystemBlobStore {
             .store_path
             .join(&info.digest.to_typefixed_string());
 
-        let f = File::open(&full_path).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
-
         //TODO: stream instead of buffering entire blob to memory
         //f.read_to_end(&mut buffer).map_err(|e| BlobError::Other { inner: Box::new(e) })?;
-        use crate::blobstore::reader_to_stream;
-        Ok(Blob{
-            info,
-            stream: reader_to_stream(BufReader::new(f))
-        })
+        use crate::blobstore::file_to_writer;
+        file_to_writer(full_path.to_owned(), writer);
+        log::info("returning");
+        Ok(info)
     }
 
-    async fn start_upload(&self) -> Result<UploadID, BlobError> {
+    async fn start_upload(&self) -> Result<UploadData, BlobError> {
         let uuid = Uuid::new_v4();
         let full_path = PathBuf::from("blobstore").join(&uuid.to_string());
 
@@ -97,14 +96,17 @@ impl BlobStore for FileSystemBlobStore {
             let file = OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(full_path)
+                .open(&full_path)
                 .unwrap();
 
             file.metadata().unwrap().len()
         };
 
         log::info(&format!("initial length: {}", len));
-        Ok(uuid.to_string())
+        Ok(UploadData{
+            upload_id: uuid.to_string(),
+            path: full_path.to_str().unwrap_or("").to_owned(),
+        })
     }
 
     async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError> {
