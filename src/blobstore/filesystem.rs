@@ -22,6 +22,7 @@ use warp::hyper::body::Bytes;
 
 use std::io::BufRead;
 use std::io::Read;
+use crate::blobstore::UploadRange;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -105,11 +106,14 @@ impl BlobStore for FileSystemBlobStore {
         log::info(&format!("initial length: {}", len));
         Ok(UploadData{
             upload_id: uuid.to_string(),
+            backend_id: "".to_string(),
             path: full_path.to_str().unwrap_or("").to_owned(),
+            parts: vec!(),
+            range_offset: 0,
         })
     }
 
-    async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError> {
+    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, input: Bytes) -> Result<u64, BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let mut file = OpenOptions::new().append(true).open(&full_path).unwrap();
 
@@ -132,25 +136,28 @@ impl BlobStore for FileSystemBlobStore {
     }
 
 
-    fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError> {
+    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let file = File::open(&full_path).unwrap();
         Digest::from_reader(BufReader::with_capacity(8 * 1024 * 1024, file)).map_err(|_| BlobError::HashMismatch) //TODO: map to different error
     }
 
-    async fn complete_upload(
+    async fn complete_uploaded_blob(
         &self,
         upload_id: &UploadID,
-        input_digest: &Digest
+        digest: &Digest
     ) -> Result<(), BlobError> {
+        // noop for the filesystem implementation
+        Ok(())
+    }
+
+    async fn register_uploaded_blob(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<(), BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let final_path = self
             .config
             .store_path
             .join(&input_digest.to_typefixed_string());
-
         
-        std::fs::rename(&full_path, &final_path).unwrap();
-        Ok(())
+        std::fs::rename(&full_path, &final_path).map_err(|e| BlobError::Other { inner: Box::new(e) })
     }
 }

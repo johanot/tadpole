@@ -15,7 +15,7 @@ hyper = "0.14"
 once_cell = "1"
 regex = "1"
 reqwest = { version = "0.11", features = [ "gzip", "rustls-tls-manual-roots" ] }
-rust-s3 = { git = "https://github.com/johanot/rust-s3", branch = "user-controlled-multipart-upload" }
+rust-s3 = { git = "https://github.com/johanot/rust-s3", branch = "copy-object-and-multipart-upload" }
 signal-hook = "0.3"
 serde = { version = "1", features = [ "rc" ] }
 serde_derive = { version = "1" }
@@ -23,6 +23,7 @@ serde_json = { version = "1" }
 sha2 = "0.9"
 strum = { version = "0.21", features = ["derive"] }
 prometheus = "0.12"
+ttl_cache = "0.5"
 tokio = { version = "1", features = ["full"] }
 warp = { version = "0.3", features = ["compression"] }
 uuid = { version = "0.8", features = ["v4"] }

@@ -38,6 +38,7 @@ use warp::http::{Response, StatusCode};
 use warp::log::Info;
 use warp::path;
 use std::io::BufWriter;
+use crate::blobstore::UploadRange;
 
 
 mod blobstore;
@@ -308,17 +309,48 @@ use std::convert::Infallible;
 
 use std::iter::Iterator;
 
+fn parse_range_header(value: &str) -> UploadRange {
+    log::info(&format!("raw input range header: {}", value));
+
+    let parts: Vec<&str> = value.split('-').collect();
+    if parts.len() == 2 {
+        let from = parts[0].parse().unwrap();
+        let to = parts[1].parse().unwrap();
+        UploadRange{
+            from,
+            to,
+        }
+    } else {
+        log::info("malformed range header");
+        UploadRange{
+            from: 0,
+            to: 0,
+        }
+    }
+}
+
 async fn patch_upload(
     name: String,
     uuid: String,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     _mu: MonolithicUpload,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
+    log::info("patch upload invoke");
+    
     let config = Config::get();
     let blob_store = get_blob_store();
 
-    let total = blob_store.patch(&uuid, input).await.unwrap();
+    let range = match headers.get("content-range") {
+        Some(r) => parse_range_header(r.to_str().unwrap()),
+        None => UploadRange{
+            from: 0,
+            to: input.len() as u64,
+        }
+    };
+    let total = {
+        blob_store.patch(&uuid, &range, input).await.unwrap()
+    };
 
     Ok(Response::builder()
         .header(
@@ -335,7 +367,7 @@ async fn patch_upload(
 async fn complete_upload(
     name: String,
     uuid: String,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     mu: MonolithicUpload,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
@@ -344,29 +376,14 @@ async fn complete_upload(
 
     if !input.is_empty() {
         log::info("Additional bytes to write in the complete_upload step");
-        blob_store.patch(&uuid, input).await.unwrap();
+        let range = parse_range_header(headers.get("content-range").unwrap().to_str().unwrap()); 
+        blob_store.patch(&uuid, &range, input).await.unwrap();
     }
     use std::str::FromStr;
 
     let input_digest = Digest::from_str(&mu.digest.as_ref().unwrap()).unwrap();
-    let store_digest = blob_store.get_upload_digest(&uuid).unwrap();
 
-    log::info(&format!(
-        "hash comparison: {:?}, {:?}",
-        &store_digest, &input_digest
-    ));
-
-    if input_digest != store_digest {
-        panic!("hash mismatch");
-    }
-
-    let _total = blob_store
-        .complete_upload(
-            &uuid,
-            &input_digest
-        )
-        .await
-        .unwrap();
+    blob_store.complete_upload(&uuid, &input_digest).await.unwrap();
 
     Ok(Response::builder()
         .header(
@@ -395,7 +412,11 @@ async fn put_manifests(
     let digest = Digest::from_bytes(&input);
 
     let res = blob_store.start_upload().await.unwrap();
-    blob_store.patch(&res.upload_id, input).await.unwrap();
+    let range = UploadRange{
+        from: 0,
+        to: input.len() as u64,
+    };
+    blob_store.patch(&res.upload_id, &range, input).await.unwrap();
     blob_store
         .complete_upload(&res.upload_id, &digest)
         .await

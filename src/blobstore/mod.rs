@@ -17,29 +17,72 @@ use futures::stream::poll_fn;
 use futures::task::Poll;
 use dbc_rust_modules::log;
 use std::io::BufRead;
+use ::s3::serde_types::Part;
 
 
 use warp::hyper::body::Bytes;
 
 type UploadID = String;
 
+#[derive(Clone, Debug, Serialize)]
 pub struct UploadData {
-    pub upload_id: String,
+    pub upload_id: UploadID,
+    pub backend_id: UploadID,
     pub path: String,
+    pub range_offset: u64,
+    pub parts: Vec<Part>,
+}
+
+impl UploadData {
+    pub fn new(upload_id: UploadID, backend_id: UploadID, path: String) -> Self {
+        Self{
+            upload_id,
+            backend_id,
+            path,
+            range_offset: 0,
+            parts: vec!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct UploadRange {
+    pub from: u64,
+    pub to: u64,
 }
 
 #[async_trait]
 pub trait BlobStore: Send + Sync {
     async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError>;
     async fn get(&self, spec: BlobSpec, sw: StreamWriter) -> Result<BlobInfo, BlobError>;
-    fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError>;
+    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError>;
     async fn start_upload(&self) -> Result<UploadData, BlobError>;
-    async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError>;
+    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, input: Bytes) -> Result<u64, BlobError>;
     async fn complete_upload(
         &self,
         upload_id: &UploadID,
         input_digest: &Digest
-    ) -> Result<(), BlobError>;
+    ) -> Result<(), BlobError> {
+
+        let _total = self
+            .complete_uploaded_blob(&upload_id, &input_digest)
+            .await?;
+    
+        let store_digest = self.get_upload_digest(&upload_id, &input_digest)?;
+    
+        log::info(&format!(
+            "hash comparison: {:?}, {:?}",
+            &store_digest, &input_digest
+        ));
+    
+        if input_digest != &store_digest {
+            return Err(BlobError::HashMismatch)
+        }
+    
+        self.register_uploaded_blob(&upload_id, &input_digest).await
+    }
+    async fn complete_uploaded_blob(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<(), BlobError>;
+    async fn register_uploaded_blob(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<(), BlobError>;
 }
 
 pub trait ToBlobStore<T> {
@@ -180,5 +223,6 @@ impl std::convert::From<BlobInfo> for BlobSpec {
 pub enum BlobError {
     NotFound,
     HashMismatch,
+    RangeUnacceptable { acceptable_range_offset: u64 },
     Other { inner: Box<dyn std::fmt::Debug> },
 }

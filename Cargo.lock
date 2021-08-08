@@ -805,6 +805,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fb9b38af92608140b86b693604b9ffcc5824240a484d1ecd4795bacb2fe88f3"
+
+[[package]]
 name = "lock_api"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1382,7 +1388,7 @@ dependencies = [
 [[package]]
 name = "rust-s3"
 version = "0.27.0-rc4"
-source = "git+https://github.com/johanot/rust-s3?branch=user-controlled-multipart-upload#13b3d73caa64442f87ddfe9dd244d41f4a42c9d2"
+source = "git+https://github.com/johanot/rust-s3?branch=copy-object-and-multipart-upload#94854997337d857f25e3f67fce510a3d06e61834"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1685,6 +1691,7 @@ dependencies = [
  "signal-hook",
  "strum",
  "tokio",
+ "ttl_cache",
  "uuid",
  "warp",
 ]
@@ -1888,6 +1895,15 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
+
+[[package]]
+name = "ttl_cache"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4189890526f0168710b6ee65ceaedf1460c48a14318ceec933cb26baa492096a"
+dependencies = [
+ "linked-hash-map",
+]
 
 [[package]]
 name = "tungstenite"

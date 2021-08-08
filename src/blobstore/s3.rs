@@ -17,6 +17,17 @@ use dbc_rust_modules::log;
 use uuid::Uuid;
 use futures::StreamExt;
 
+use std::time::Duration;
+use ttl_cache::TtlCache;
+use std::sync::RwLock;
+use crate::blobstore::UploadRange;
+
+lazy_static! {
+    static ref UPLOADS: RwLock<TtlCache<String, UploadData>> = RwLock::new(TtlCache::new(64));
+}
+
+const TEN_MEGS: usize = 8_388_608;
+
 #[derive(Deserialize, Debug)]
 struct CredentialsHelper {
     access_key: String,
@@ -58,15 +69,6 @@ impl std::convert::From<anyhow::Error> for BlobError {
     fn from(err: anyhow::Error) -> Self {
         Self::Other{
             inner: Box::new(err)
-        }
-    }
-}
-
-impl std::convert::From<InitiateMultipartUploadResponse> for UploadData {
-    fn from(response: InitiateMultipartUploadResponse) -> Self {
-        Self{
-            upload_id: response.upload_id,
-            path: response.key,
         }
     }
 }
@@ -120,24 +122,69 @@ impl BlobStore for S3BlobStore {
     }
 
     async fn start_upload(&self) -> Result<UploadData, BlobError> {
-        let uuid = Uuid::new_v4();
-        Ok(self.bucket.initiate_multipart_upload(&uuid.to_string()).await.map(|r| r.into())?)
+        let uuid = Uuid::new_v4().to_string();
+        
+        let res = self.bucket.initiate_multipart_upload(&format!("/{}", &uuid)).await?;
+        let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+        let data = UploadData::new(uuid.clone(), res.upload_id, res.key);
+        uploads.insert(uuid.clone(), data.clone(), Duration::from_secs(300));
+
+        Ok(data)
     }
 
-    async fn patch(&self, upload_id: &UploadID, input: Bytes) -> Result<u64, BlobError> {
-        Err(BlobError::NotFound)
+    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, chunk: Bytes) -> Result<u64, BlobError> {
+        let data = {
+            let uploads = UPLOADS.read().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+            let data = uploads.get(upload_id).ok_or(BlobError::NotFound)?;
+            log::data("upload data on file", &data);
+            log::data("input range", &range);
+            if (range.from == 0 && data.range_offset == 0) || (range.from == data.range_offset+1) {
+                Ok(data.clone())
+            } else {
+                Err(BlobError::RangeUnacceptable { acceptable_range_offset: data.range_offset })
+            }
+        }?;
+        let new_part_number = data.parts.len() as u32 +1;
+
+        log::info("start s3 upload");
+
+        let part = self.bucket.put_multipart_chunk(chunk.to_vec(), &data.path, new_part_number, &data.backend_id).await?;
+        {
+            log::info("end s3 upload");
+            let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+            let data_mut = uploads.get_mut(upload_id).ok_or(BlobError::NotFound)?;
+            data_mut.range_offset = range.to;
+            data_mut.parts.push(part)
+        }
+        Ok(range.to)
     }
 
-    fn get_upload_digest(&self, upload_id: &UploadID) -> Result<Digest, BlobError> {
-        Err(BlobError::NotFound)
+    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
+        Ok(input_digest.to_owned()) // TODO: return real digest
     }
 
-    async fn complete_upload(
+    async fn complete_uploaded_blob(
         &self,
         upload_id: &UploadID,
-        input_digest: &Digest,
+        input_digest: &Digest
     ) -> Result<(), BlobError> {
+
+        let data = {
+            let uploads = UPLOADS.read().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+            let data = uploads.get(upload_id).ok_or(BlobError::NotFound)?;
+            log::data("upload data on file, when completing", &data);
+            data.clone()
+        };
         
-        Err(BlobError::HashMismatch)
+        self.bucket.complete_multipart_upload(&data.path, &data.backend_id, data.parts).await.map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+        let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+        uploads.remove(upload_id);
+        Ok(())
+    }
+
+    async fn register_uploaded_blob(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<(), BlobError> {
+        self.bucket.copy_object_internal(upload_id, input_digest.to_typefixed_string()).await.unwrap();
+        self.bucket.delete_object(upload_id).await.unwrap();
+        Ok(())
     }
 }
