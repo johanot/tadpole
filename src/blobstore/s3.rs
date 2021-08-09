@@ -136,8 +136,9 @@ impl BlobStore for S3BlobStore {
         let data = {
             let uploads = UPLOADS.read().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
             let data = uploads.get(upload_id).ok_or(BlobError::NotFound)?;
-            log::data("upload data on file", &data);
-            log::data("input range", &range);
+            //log::data("upload data on file", &data);
+            //log::data("input range", &range);
+            //log::data("data length", &chunk.len());
             if (range.from == 0 && data.range_offset == 0) || (range.from == data.range_offset+1) {
                 Ok(data.clone())
             } else {
@@ -146,11 +147,11 @@ impl BlobStore for S3BlobStore {
         }?;
         let new_part_number = data.parts.len() as u32 +1;
 
-        log::info("start s3 upload");
+        //log::info("start s3 upload");
 
         let part = self.bucket.put_multipart_chunk(chunk.to_vec(), &data.path, new_part_number, &data.backend_id).await?;
         {
-            log::info("end s3 upload");
+            //log::info("end s3 upload");
             let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
             let data_mut = uploads.get_mut(upload_id).ok_or(BlobError::NotFound)?;
             data_mut.range_offset = range.to;

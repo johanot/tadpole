@@ -52,6 +52,8 @@ mod metrics;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const BUF_SIZE: usize = 16 * 1024 * 1024;
+
 #[derive(Serialize, Debug)]
 struct RequestLog {
     //remote_addr: String,
@@ -68,7 +70,7 @@ pub struct MonolithicUpload {
     pub state: Option<String>,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
     log::init(APP_NAME.to_string()).unwrap();
 
@@ -142,7 +144,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .and(path!("v2" / String / "blobs" / "stream" / String))
         .and(headers)
         .and(warp::query())
-        .and(warp::filters::body::bytes())
+        .and(warp::filters::body::stream())
         .and_then(patch_upload)
         .with(warp::compression::gzip());
 
@@ -329,28 +331,73 @@ fn parse_range_header(value: &str) -> UploadRange {
     }
 }
 
+use warp::{Buf, Stream};
+use bytes::BufMut;
+
 async fn patch_upload(
     name: String,
     uuid: String,
     headers: HeaderMap,
     _mu: MonolithicUpload,
-    input: Bytes,
+    mut body: impl Stream<Item = Result<impl Buf, warp::Error>> + Unpin,
 ) -> Result<impl warp::Reply, Infallible> {
-    log::info("patch upload invoke");
+    
+    use std::sync::mpsc::{channel, Sender, Receiver};
     
     let config = Config::get();
     let blob_store = get_blob_store();
 
-    let range = match headers.get("content-range") {
+    let mut offset = match headers.get("content-range") {
         Some(r) => parse_range_header(r.to_str().unwrap()),
         None => UploadRange{
             from: 0,
-            to: input.len() as u64,
+            to: 0
         }
-    };
-    let total = {
-        blob_store.patch(&uuid, &range, input).await.unwrap()
-    };
+    }.from;
+
+    
+
+    let (sender, receiver): (Sender<Option<Bytes>>, Receiver<Option<Bytes>>) = channel();
+    let uuid_ = uuid.clone();
+
+    let fut = tokio::spawn(async move {
+        loop {
+            let item = receiver.recv().unwrap();
+            if item.is_none() {
+                break;
+            }
+            let item = item.unwrap();
+            let len = item.len() as u64;
+            blob_store.patch(&uuid_, &UploadRange{
+                from: offset,
+                to: offset + len -1,
+            }, item).await.unwrap();
+            //total = total + len;
+            offset = offset + len;
+            log::data("offset", &offset);
+        }
+        offset
+    });
+
+    use bytes::BytesMut;
+
+    let mut buf = BytesMut::with_capacity(BUF_SIZE);
+    while let Some(item) = body.next().await {
+        let mut item = item.unwrap();
+        let len = item.remaining();
+        if buf.len() + len < BUF_SIZE {
+            buf.put(item);
+        } else {
+            sender.send(Some(buf.freeze()));
+            buf = BytesMut::with_capacity(BUF_SIZE);
+            buf.put(item);
+        }
+    }
+    sender.send(Some(buf.freeze()));
+    sender.send(None);
+
+    log::info("waiting for persisting future");
+    let total: u64 = fut.await.unwrap();
 
     Ok(Response::builder()
         .header(

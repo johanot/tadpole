@@ -21,6 +21,7 @@ use ::s3::serde_types::Part;
 
 
 use warp::hyper::body::Bytes;
+use warp::Buf;
 
 type UploadID = String;
 
