@@ -113,7 +113,7 @@ impl BlobStore for FileSystemBlobStore {
         })
     }
 
-    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, input: Bytes) -> Result<u64, BlobError> {
+    async fn patch(&self, upload_id: &UploadID, range: UploadRange, input: Bytes) -> Result<u64, BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let mut file = OpenOptions::new().append(true).open(&full_path).unwrap();
 
@@ -136,7 +136,7 @@ impl BlobStore for FileSystemBlobStore {
     }
 
 
-    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
+    async fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let file = File::open(&full_path).unwrap();
         Digest::from_reader(BufReader::with_capacity(8 * 1024 * 1024, file)).map_err(|_| BlobError::HashMismatch) //TODO: map to different error

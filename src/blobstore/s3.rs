@@ -21,6 +21,7 @@ use std::time::Duration;
 use ttl_cache::TtlCache;
 use std::sync::RwLock;
 use crate::blobstore::UploadRange;
+use crate::blobstore::UploadPart;
 
 lazy_static! {
     static ref UPLOADS: RwLock<TtlCache<String, UploadData>> = RwLock::new(TtlCache::new(64));
@@ -88,9 +89,13 @@ impl S3BlobStore {
     }
 }
 
+async fn gimme_raw(bucket: Bucket, path: String, mut writer: StreamWriter) {    
+    bucket.get_object_stream(path, &mut writer).await.unwrap();
+}
+
 fn gimme(bucket: Bucket, info: BlobInfo, mut writer: StreamWriter) {
     tokio::spawn(async move {
-        bucket.get_object_stream(&info.digest.to_typefixed_string(), &mut writer).await.unwrap();
+        gimme_raw(bucket, info.digest.to_typefixed_string(), writer).await;
     });
 }
 
@@ -132,36 +137,36 @@ impl BlobStore for S3BlobStore {
         Ok(data)
     }
 
-    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, chunk: Bytes) -> Result<u64, BlobError> {
+    async fn patch(&self, upload_id: &UploadID, range: UploadRange, chunk: Bytes) -> Result<u64, BlobError> {
         let data = {
             let uploads = UPLOADS.read().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
             let data = uploads.get(upload_id).ok_or(BlobError::NotFound)?;
             //log::data("upload data on file", &data);
             //log::data("input range", &range);
             //log::data("data length", &chunk.len());
-            if (range.from == 0 && data.range_offset == 0) || (range.from == data.range_offset+1) {
-                Ok(data.clone())
-            } else {
-                Err(BlobError::RangeUnacceptable { acceptable_range_offset: data.range_offset })
-            }
-        }?;
-        let new_part_number = data.parts.len() as u32 +1;
+            data.clone()
+        };
 
-        //log::info("start s3 upload");
+        //log::data("start s3 upload, range", &range);
 
-        let part = self.bucket.put_multipart_chunk(chunk.to_vec(), &data.path, new_part_number, &data.backend_id).await?;
+        let part = self.bucket.put_multipart_chunk(chunk.to_vec(), &data.path, range.part_number, &data.backend_id).await?;
         {
             //log::info("end s3 upload");
             let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
             let data_mut = uploads.get_mut(upload_id).ok_or(BlobError::NotFound)?;
             data_mut.range_offset = range.to;
-            data_mut.parts.push(part)
+            data_mut.parts.push(UploadPart(part))
         }
         Ok(range.to)
     }
 
-    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
-        Ok(input_digest.to_owned()) // TODO: return real digest
+    async fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError> {
+        
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let sw = StreamWriter::new_channeled(sender);
+        gimme_raw(self.bucket.clone(), upload_id.to_string(), sw).await;
+
+        Digest::from_channel(receiver).map_err(|e| BlobError::Other { inner: Box::new(e) })
     }
 
     async fn complete_uploaded_blob(
@@ -177,7 +182,11 @@ impl BlobStore for S3BlobStore {
             data.clone()
         };
         
-        self.bucket.complete_multipart_upload(&data.path, &data.backend_id, data.parts).await.map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
+        let mut parts = data.parts.clone();
+        parts.sort();
+        let parts = parts.iter().map(std::convert::Into::into).collect();
+
+        self.bucket.complete_multipart_upload(&data.path, &data.backend_id, parts).await.map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
         let mut uploads = UPLOADS.write().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
         uploads.remove(upload_id);
         Ok(())

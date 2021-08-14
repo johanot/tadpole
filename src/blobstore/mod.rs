@@ -31,7 +31,7 @@ pub struct UploadData {
     pub backend_id: UploadID,
     pub path: String,
     pub range_offset: u64,
-    pub parts: Vec<Part>,
+    pub parts: Vec<UploadPart>,
 }
 
 impl UploadData {
@@ -46,19 +46,68 @@ impl UploadData {
     }
 }
 
+use core::cmp::Ordering;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadPart(Part);
+
+impl std::convert::Into<Part> for &UploadPart {
+    fn into(self) -> Part {
+        self.0.clone()
+    }
+}
+
+impl PartialOrd for UploadPart {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UploadPart {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.part_number.cmp(&other.0.part_number)
+    }
+}
+
+impl PartialEq for UploadPart {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.part_number == other.0.part_number
+    }
+}
+
+impl Eq for UploadPart {
+    /*fn eq(&self, other: &Self) -> bool {
+        self.0.part_number == other.0.part_number
+    }*/
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct UploadRange {
     pub from: u64,
     pub to: u64,
+    pub part_number: u32,
+}
+
+impl UploadRange {
+    pub fn new(from: u64, to: u64) -> Self {
+        Self{
+            from,
+            to,
+            part_number: 0,
+        }
+    }
+    pub fn new_zero() -> Self {
+        Self::new(0, 0)
+    }
 }
 
 #[async_trait]
 pub trait BlobStore: Send + Sync {
     async fn stat(&self, spec: BlobSpec) -> Result<BlobInfo, BlobError>;
     async fn get(&self, spec: BlobSpec, sw: StreamWriter) -> Result<BlobInfo, BlobError>;
-    fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError>;
+    async fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError>;
     async fn start_upload(&self) -> Result<UploadData, BlobError>;
-    async fn patch(&self, upload_id: &UploadID, range: &UploadRange, input: Bytes) -> Result<u64, BlobError>;
+    async fn patch(&self, upload_id: &UploadID, range: UploadRange, input: Bytes) -> Result<u64, BlobError>;
     async fn complete_upload(
         &self,
         upload_id: &UploadID,
@@ -69,7 +118,7 @@ pub trait BlobStore: Send + Sync {
             .complete_uploaded_blob(&upload_id, &input_digest)
             .await?;
     
-        let store_digest = self.get_upload_digest(&upload_id, &input_digest)?;
+        let store_digest = self.get_upload_digest(&upload_id, &input_digest).await?;
     
         log::info(&format!(
             "hash comparison: {:?}, {:?}",
@@ -116,17 +165,22 @@ use futures::stream::{self, StreamExt};
 
 type StreamItemResult = Result<Bytes, Box<(dyn Error + Send + Sync + 'static)>>;
 type StreamPollResult = Poll<Option<StreamItemResult>>;
-use hyper::body::Sender;
+
+use std::sync::Arc;
 
 pub enum StreamWriter {
-    Streamed(Sender),
+    Channeled(std::sync::mpsc::Sender<Bytes>),
+    Streamed(hyper::body::Sender),
     Dummy,
 }
 
 
 impl StreamWriter {
-    pub fn new(sender: Sender) -> Self {
+    pub fn new(sender: hyper::body::Sender) -> Self {
         Self::Streamed(sender)
+    }
+    pub fn new_channeled(sender: std::sync::mpsc::Sender<Bytes>) -> Self {
+        Self::Channeled(sender)
     }
     pub fn new_dummy() -> Self {
         Self::Dummy
@@ -134,12 +188,14 @@ impl StreamWriter {
     pub fn write_sync(&mut self, bytes: Bytes) -> Result<(), hyper::body::Bytes> {
         match self {
             StreamWriter::Streamed(s) => s.try_send_data(bytes),
+            StreamWriter::Channeled(s) => Ok(s.send(bytes).unwrap()), //TODO: don't panic
             StreamWriter::Dummy => Ok(()),
         }
     }
     pub async fn write_async(&mut self, bytes: Bytes) -> Result<(), hyper::Error> {
         match self {
             StreamWriter::Streamed(s) => s.send_data(bytes).await,
+            StreamWriter::Channeled(s) => Ok(s.send(bytes).unwrap()), //TODO: don't panic
             StreamWriter::Dummy => Ok(()),
         }
     }

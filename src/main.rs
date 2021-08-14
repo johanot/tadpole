@@ -70,7 +70,7 @@ pub struct MonolithicUpload {
     pub state: Option<String>,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() {
     log::init(APP_NAME.to_string()).unwrap();
 
@@ -318,16 +318,10 @@ fn parse_range_header(value: &str) -> UploadRange {
     if parts.len() == 2 {
         let from = parts[0].parse().unwrap();
         let to = parts[1].parse().unwrap();
-        UploadRange{
-            from,
-            to,
-        }
+        UploadRange::new(from, to)
     } else {
         log::info("malformed range header");
-        UploadRange{
-            from: 0,
-            to: 0,
-        }
+        UploadRange::new_zero()
     }
 }
 
@@ -343,24 +337,25 @@ async fn patch_upload(
 ) -> Result<impl warp::Reply, Infallible> {
     
     use std::sync::mpsc::{channel, Sender, Receiver};
+    use futures::stream::{FuturesUnordered, FuturesOrdered};
+    use futures::FutureExt;
+    use futures::future;
     
     let config = Config::get();
     let blob_store = get_blob_store();
 
     let mut offset = match headers.get("content-range") {
         Some(r) => parse_range_header(r.to_str().unwrap()),
-        None => UploadRange{
-            from: 0,
-            to: 0
-        }
+        None => UploadRange::new_zero()
     }.from;
 
-    
 
     let (sender, receiver): (Sender<Option<Bytes>>, Receiver<Option<Bytes>>) = channel();
     let uuid_ = uuid.clone();
 
     let fut = tokio::spawn(async move {
+        let mut futures = FuturesUnordered::new();
+        let mut part_number = 0;
         loop {
             let item = receiver.recv().unwrap();
             if item.is_none() {
@@ -368,14 +363,18 @@ async fn patch_upload(
             }
             let item = item.unwrap();
             let len = item.len() as u64;
-            blob_store.patch(&uuid_, &UploadRange{
+            part_number = part_number + 1;
+            futures.push(blob_store.patch(&uuid_, UploadRange{
                 from: offset,
                 to: offset + len -1,
-            }, item).await.unwrap();
-            //total = total + len;
+                part_number,
+            }, item));
             offset = offset + len;
-            log::data("offset", &offset);
         }
+        futures.for_each(|item| {
+            item.unwrap();
+            future::ready(())
+        }).await;
         offset
     });
 
@@ -424,7 +423,7 @@ async fn complete_upload(
     if !input.is_empty() {
         log::info("Additional bytes to write in the complete_upload step");
         let range = parse_range_header(headers.get("content-range").unwrap().to_str().unwrap()); 
-        blob_store.patch(&uuid, &range, input).await.unwrap();
+        blob_store.patch(&uuid, range, input).await.unwrap();
     }
     use std::str::FromStr;
 
@@ -462,8 +461,9 @@ async fn put_manifests(
     let range = UploadRange{
         from: 0,
         to: input.len() as u64,
+        part_number: 1,
     };
-    blob_store.patch(&res.upload_id, &range, input).await.unwrap();
+    blob_store.patch(&res.upload_id, range, input).await.unwrap();
     blob_store
         .complete_upload(&res.upload_id, &digest)
         .await

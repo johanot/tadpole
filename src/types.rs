@@ -5,6 +5,9 @@ use std::str::FromStr;
 use std::io::BufRead;
 
 use warp::hyper::body::Bytes;
+use std::sync::mpsc::Receiver;
+
+use dbc_rust_modules::log;
 
 #[derive(Clone, Debug, Serialize)]
 pub enum ContentType {
@@ -86,6 +89,19 @@ impl Digest {
             } else {
                 break;
             }
+        }
+        Ok(Self {
+            algo,
+            value: hasher.finalize().to_vec(),
+        })
+    }
+
+    pub fn from_channel(receiver: Receiver<Bytes>) -> Result<Self, DigestParseError> {
+        //TODO: hardcoded until further algorithms are support, consider generifying then
+        let algo = DigestAlgo::Sha256;
+        let mut hasher = Sha256::new();
+        while let Some(item) = receiver.recv().ok() {
+            hasher.update(item);
         }
         Ok(Self {
             algo,
