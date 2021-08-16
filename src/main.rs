@@ -229,6 +229,13 @@ fn get_blob_store() -> Box<dyn BlobStore> {
     }
 }
 
+fn get_metadata_store() -> Box<dyn MetadataStore> {
+    match &Config::get().metadata_store {
+        MetadataStoreConfig::FileSystem(c) => Box::new(c.to_metadata_store()),
+        MetadataStoreConfig::Etcd(c) => Box::new(c.to_metadata_store()),
+    }
+}
+
 async fn head_blob(repo: String, digest: Digest) -> Result<impl warp::Reply, Infallible> {
     let config = Config::get();
     let blob_store = get_blob_store();
@@ -469,17 +476,13 @@ async fn put_manifests(
         .await
         .unwrap();
 
-    let metadata_store: FileSystemMetadataStore = config
-        .metadata_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_metadata_store();
+    let metadata_store = get_metadata_store();
     
     metadata_store.write_spec(&ManifestSpec{
+        repo: "unknown".to_string(), //TODO
         name: name.clone(),
         reference: tag.clone(),
-    }, &digest).unwrap();
+    }, &digest).await.unwrap();
 
     Ok(Response::builder()
         .header(
@@ -513,12 +516,7 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
 async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, ManifestError> {
     let config = Config::get();
 
-    let metadata_store: FileSystemMetadataStore = config
-        .metadata_store
-        .filesystem
-        .as_ref()
-        .unwrap()
-        .to_metadata_store();
+    let metadata_store = get_metadata_store();
   
     let blob_store = get_blob_store();
     let (sw, body) = {
@@ -531,9 +529,10 @@ async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, M
     };
 
     let digest = metadata_store.read_spec(&ManifestSpec{
+        repo: "unknown".to_string(), //TODO
         name: name.clone(),
         reference: tag.clone(),
-    }).map_err(std::convert::Into::<ManifestError>::into)?;
+    }).await.map_err(std::convert::Into::<ManifestError>::into)?;
 
     let info = blob_store.get(BlobSpec{ digest: digest.clone() }, sw).await.map_err(std::convert::Into::<ManifestError>::into).unwrap();
     Ok(Manifest{

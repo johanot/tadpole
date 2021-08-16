@@ -1,3 +1,4 @@
+pub mod etcd;
 pub mod filesystem;
 
 use async_trait::async_trait;
@@ -11,13 +12,9 @@ use std::str::FromStr;
 use std::convert::Infallible;
 
 #[async_trait]
-pub trait MetadataStore<C> {
-    fn init(config: C) -> Result<Self, MetadataError>
-    where
-        Self: Sized;
-
-    fn write_spec(&self, tag: &ManifestSpec, manifest_digest: &Digest) -> Result<(), MetadataError>;
-    fn read_spec(&self, tag: &ManifestSpec) -> Result<Digest, MetadataError>;
+pub trait MetadataStore: Send + Sync {
+    async fn write_spec(&self, tag: &ManifestSpec, manifest_digest: &Digest) -> Result<(), MetadataError>;
+    async fn read_spec(&self, tag: &ManifestSpec) -> Result<Digest, MetadataError>;
 }
 
 pub trait ToMetadataStore<T> {
@@ -26,12 +23,14 @@ pub trait ToMetadataStore<T> {
 
 #[derive(Debug)]
 pub enum MetadataError {
+    Ambiguous,
     NotFound,
     Other { inner: Box<dyn std::fmt::Debug> },
 }
 
 #[derive(Debug)]
 pub struct ManifestSpec {
+    pub repo: String,
     pub name: String,
     pub reference: ImageRef,
 }

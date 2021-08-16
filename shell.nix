@@ -12,6 +12,9 @@ pkgs.mkShell {
     niv
     openssl.dev
     pkgconfig
+    protobuf
     rustc
   ];
+  PROTOC="${pkgs.protobuf}/bin/protoc";
+  PROTOC_INCLUDE="${pkgs.protobuf}/include";
 }

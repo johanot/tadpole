@@ -24,15 +24,18 @@ impl ToMetadataStore<FileSystemMetadataStore> for FileSystemMetadataStoreConfig 
   }
 }
 
-#[async_trait]
-impl MetadataStore<FileSystemMetadataStoreConfig> for FileSystemMetadataStore {
+impl FileSystemMetadataStore {
   fn init(config: FileSystemMetadataStoreConfig) -> Result<Self, MetadataError> {
     fs::create_dir_all(&config.tags_path)
         .map_err(|e| MetadataError::Other { inner: Box::new(e) })?;
     Ok(Self { config })
   }
+}
 
-  fn write_spec(&self, spec: &ManifestSpec, manifest_digest: &Digest) -> Result<(), MetadataError> {
+#[async_trait]
+impl MetadataStore for FileSystemMetadataStore {
+
+  async fn write_spec(&self, spec: &ManifestSpec, manifest_digest: &Digest) -> Result<(), MetadataError> {
     let fqp = self.config.tags_path.join(&spec.name);
     match fs::create_dir(&fqp) {
       Ok(()) => Ok(()),
@@ -48,7 +51,7 @@ impl MetadataStore<FileSystemMetadataStoreConfig> for FileSystemMetadataStore {
     Ok(())
   }
 
-  fn read_spec(&self, spec: &ManifestSpec) -> Result<Digest, MetadataError> {
+  async fn read_spec(&self, spec: &ManifestSpec) -> Result<Digest, MetadataError> {
     use std::str::FromStr;
 
     match &spec.reference {
