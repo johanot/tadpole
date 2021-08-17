@@ -38,7 +38,7 @@ impl ToMetadataStore<EtcdMetadataStore> for EtcdMetadataStoreConfig {
 }
 
 fn get_key_for_reference(prefix: &str, repo: &str, name: &str, reference: &str) -> String {
-  format!("{prefix}/{repo}/{name}/{reference}",
+  format!("{prefix}/tags/{repo}/{name}/{reference}",
     prefix=prefix,
     repo=repo,
     name=name,
@@ -91,7 +91,7 @@ impl MetadataStore for EtcdMetadataStore {
 
     let put_req = PutRequest::new(get_key_for_reference(
       &self.config.prefix, 
-      &spec.repo,
+      &spec.repo.name,
       &spec.name,
       &spec.reference.to_string()), manifest_digest.to_typefixed_string());
 
@@ -108,7 +108,7 @@ impl MetadataStore for EtcdMetadataStore {
         let mut kv_client = self.client.kv();
         let req = RangeRequest::new(KeyRange::key(get_key_for_reference(
           &self.config.prefix, 
-          &spec.repo,
+          &spec.repo.name,
           &spec.name,
           &spec.reference.to_string())));
         

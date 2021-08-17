@@ -19,12 +19,19 @@ impl Config {
     }
 }
 
+#[derive(Clone, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct Repository {
+    pub name: String,
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub listen_port: u16,
     pub blob_store: BlobStoreConfig,
     pub metadata_store: MetadataStoreConfig,
+    pub repositories: Vec<Repository>,
 }
 
 #[derive(Deserialize, Debug)]

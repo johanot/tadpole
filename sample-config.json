@@ -9,5 +9,13 @@
     "filesystem": {
       "tags_path": "metadatastore/tags"
     }
-  }
+  },
+  "repositories": [
+    {
+      "name": "local.colabo.dk"
+    },
+    {
+      "name": "localhost"
+    }
+  ]
 }

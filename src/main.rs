@@ -40,6 +40,10 @@ use warp::path;
 use std::io::BufWriter;
 use crate::blobstore::UploadRange;
 
+use warp::host::Authority;
+use warp::Rejection;
+
+use crate::config::Repository;
 
 mod blobstore;
 mod metadatastore;
@@ -125,6 +129,16 @@ async fn main() {
 
 use reqwest::header::HeaderMap;
 
+fn extract_host() -> impl Filter<Extract = (Repository,), Error = Rejection> + Clone {
+    warp::filters::host::optional().and_then(|authority: Option<Authority>| async move {
+        let config = Config::get();
+        authority
+            .and_then(|a| config.repositories.iter().find(|r| r.name == a.host()))
+            .ok_or(warp::reject::not_found())
+            .map(|r| r.to_owned())
+    })
+}
+
 fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     let config = Config::get();
     let listen_port = config.listen_port;
@@ -157,6 +171,7 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .with(warp::compression::gzip());
 
     let put_manifests = warp::put()
+        .and(extract_host())
         .and(path!("v2" / String / "manifests" / ImageRef))
         .and(warp::filters::body::bytes())
         .and_then(put_manifests)
@@ -165,14 +180,6 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
     let upload_check = warp::get()
         .and(path!("v2" / String / "blobs" / "stream" / String))
         .map(upload_check);
-
-    /*let host = warp::host::optional().map(|authority: Option<Authority>| {
-        if let Some(a) = authority {
-            format!("{} is currently not at home", a.host())
-        } else {
-            "please state who you're trying to reach".to_owned()
-        }
-    });*/
 
     let version_check = warp::get().and(path!("v2")).map(|| {
         Response::builder()
@@ -190,9 +197,11 @@ fn listen(receiver: tokio::sync::oneshot::Receiver<()>) {
         .and(path!("v2" / String / "blobs" / Digest))
         .and_then(get_blob);
     let head_manifests = warp::head()
+        .and(extract_host())
         .and(path!("v2" / String / "manifests" / ImageRef))
         .and_then(head_manifests);
     let get_manifests = warp::get()
+        .and(extract_host())
         .and(path!("v2" / String / "manifests" / ImageRef))
         .and_then(get_manifests);
 
@@ -455,10 +464,12 @@ async fn complete_upload(
 }
 
 async fn put_manifests(
+    repository: Repository,
     name: String,
     tag: ImageRef,
     input: Bytes,
 ) -> Result<impl warp::Reply, Infallible> {
+
     let config = Config::get();
     let blob_store = get_blob_store();
 
@@ -479,7 +490,7 @@ async fn put_manifests(
     let metadata_store = get_metadata_store();
     
     metadata_store.write_spec(&ManifestSpec{
-        repo: "unknown".to_string(), //TODO
+        repo: repository.clone(),
         name: name.clone(),
         reference: tag.clone(),
     }, &digest).await.unwrap();
@@ -513,7 +524,7 @@ fn upload_check(name: String, uuid: String) -> impl warp::Reply {
         .body("")
 }
 
-async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, ManifestError> {
+async fn manifest(repository: &Repository, name: String, tag: ImageRef, head: bool) -> Result<Manifest, ManifestError> {
     let config = Config::get();
 
     let metadata_store = get_metadata_store();
@@ -529,7 +540,7 @@ async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, M
     };
 
     let digest = metadata_store.read_spec(&ManifestSpec{
-        repo: "unknown".to_string(), //TODO
+        repo: repository.clone(),
         name: name.clone(),
         reference: tag.clone(),
     }).await.map_err(std::convert::Into::<ManifestError>::into)?;
@@ -541,14 +552,14 @@ async fn manifest(name: String, tag: ImageRef, head: bool) -> Result<Manifest, M
     })
 }
 
-async fn head_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
-    Ok(manifest(name, tag, true).await
+async fn head_manifests(repository: Repository, name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
+    Ok(manifest(&repository, name, tag, true).await
         .to_response()
         .empty())
 }
 
-async fn get_manifests(name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
-    Ok(manifest(name, tag, false).await
+async fn get_manifests(repository: Repository, name: String, tag: ImageRef) -> Result<impl warp::Reply, Infallible> {
+    Ok(manifest(&repository, name, tag, false).await
         .to_response()
         .emit())
 }

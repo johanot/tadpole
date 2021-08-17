@@ -11,6 +11,8 @@ use crate::blobstore::Blob;
 use std::str::FromStr;
 use std::convert::Infallible;
 
+use crate::config::Repository;
+
 #[async_trait]
 pub trait MetadataStore: Send + Sync {
     async fn write_spec(&self, tag: &ManifestSpec, manifest_digest: &Digest) -> Result<(), MetadataError>;
@@ -30,7 +32,7 @@ pub enum MetadataError {
 
 #[derive(Debug)]
 pub struct ManifestSpec {
-    pub repo: String,
+    pub repo: Repository,
     pub name: String,
     pub reference: ImageRef,
 }
