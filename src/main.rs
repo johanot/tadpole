@@ -380,11 +380,11 @@ async fn patch_upload(
             let item = item.unwrap();
             let len = item.len() as u64;
             part_number = part_number + 1;
-            futures.push(blob_store.patch(&uuid_, UploadRange{
+            futures.push(blob_store.patch(&uuid_, Some(UploadRange{
                 from: offset,
                 to: offset + len -1,
                 part_number,
-            }, item));
+            }), item));
             offset = offset + len;
         }
         futures.for_each(|item| {
@@ -438,8 +438,7 @@ async fn complete_upload(
 
     if !input.is_empty() {
         log::info("Additional bytes to write in the complete_upload step");
-        let range = parse_range_header(headers.get("content-range").unwrap().to_str().unwrap()); 
-        blob_store.patch(&uuid, range, input).await.unwrap();
+        blob_store.patch(&uuid, None, input).await.unwrap();
     }
     use std::str::FromStr;
 
@@ -481,7 +480,7 @@ async fn put_manifests(
         to: input.len() as u64,
         part_number: 1,
     };
-    blob_store.patch(&res.upload_id, range, input).await.unwrap();
+    blob_store.patch(&res.upload_id, Some(range), input).await.unwrap();
     blob_store
         .complete_upload(&res.upload_id, &digest)
         .await
@@ -545,7 +544,7 @@ async fn manifest(repository: &Repository, name: String, tag: ImageRef, head: bo
         reference: tag.clone(),
     }).await.map_err(std::convert::Into::<ManifestError>::into)?;
 
-    let info = blob_store.get(BlobSpec{ digest: digest.clone() }, sw).await.map_err(std::convert::Into::<ManifestError>::into).unwrap();
+    let info = blob_store.get(BlobSpec{ digest: digest.clone() }, sw).await.map_err(std::convert::Into::<ManifestError>::into)?;
     Ok(Manifest{
         info,
         body,

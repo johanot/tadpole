@@ -113,7 +113,7 @@ impl BlobStore for FileSystemBlobStore {
         })
     }
 
-    async fn patch(&self, upload_id: &UploadID, range: UploadRange, input: Bytes) -> Result<u64, BlobError> {
+    async fn patch(&self, upload_id: &UploadID, range: Option<UploadRange>, input: Bytes) -> Result<u64, BlobError> {
         let full_path = self.config.store_path.join(&upload_id);
         let mut file = OpenOptions::new().append(true).open(&full_path).unwrap();
 

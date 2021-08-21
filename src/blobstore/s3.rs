@@ -137,7 +137,7 @@ impl BlobStore for S3BlobStore {
         Ok(data)
     }
 
-    async fn patch(&self, upload_id: &UploadID, range: UploadRange, chunk: Bytes) -> Result<u64, BlobError> {
+    async fn patch(&self, upload_id: &UploadID, range: Option<UploadRange>, chunk: Bytes) -> Result<u64, BlobError> {
         let data = {
             let uploads = UPLOADS.read().map_err(|e| BlobError::Other{ inner: Box::new(e) })?;
             let data = uploads.get(upload_id).ok_or(BlobError::NotFound)?;
@@ -145,6 +145,15 @@ impl BlobStore for S3BlobStore {
             //log::data("input range", &range);
             //log::data("data length", &chunk.len());
             data.clone()
+        };
+
+        let range = match range {
+            Some(r) => r,
+            None => UploadRange{
+                from: data.range_offset,
+                to: data.range_offset + chunk.len() as u64,
+                part_number: data.parts.len() as u32 + 1
+            }
         };
 
         //log::data("start s3 upload, range", &range);

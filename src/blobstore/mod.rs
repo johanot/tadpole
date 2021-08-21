@@ -107,7 +107,7 @@ pub trait BlobStore: Send + Sync {
     async fn get(&self, spec: BlobSpec, sw: StreamWriter) -> Result<BlobInfo, BlobError>;
     async fn get_upload_digest(&self, upload_id: &UploadID, input_digest: &Digest) -> Result<Digest, BlobError>;
     async fn start_upload(&self) -> Result<UploadData, BlobError>;
-    async fn patch(&self, upload_id: &UploadID, range: UploadRange, input: Bytes) -> Result<u64, BlobError>;
+    async fn patch(&self, upload_id: &UploadID, range: Option<UploadRange>, input: Bytes) -> Result<u64, BlobError>;
     async fn complete_upload(
         &self,
         upload_id: &UploadID,
