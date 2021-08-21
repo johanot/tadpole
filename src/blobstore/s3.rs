@@ -52,15 +52,56 @@ where
     Region::from_str(&region).map_err(de::Error::custom)
 }
 
+fn deserialize_endpoint<'de, D>(deserializer: D) -> Result<Region, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use std::str::FromStr;
+    let endpoint: String = Deserialize::deserialize(deserializer)?;
+    Ok(Region::Custom {
+        region: "us-east-1".to_string(),
+        endpoint
+    })
+}
+
 #[derive(Clone, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3BlobStoreConfig {
     bucket_name: String,
     #[serde(deserialize_with = "deserialize_credentials")]
     credentials: Credentials,
-    #[serde(deserialize_with = "deserialize_region")]
-    region: Region,
+    remote: RegionOrEndpoint
 }
+
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum RegionOrEndpoint {
+    #[serde(deserialize_with = "deserialize_region")]
+    Region(Region),
+    Endpoint(String),
+}
+
+impl RegionOrEndpoint {
+    fn to_region(&self) -> Region {
+        match self {
+            RegionOrEndpoint::Region(region) => region.clone(),
+            RegionOrEndpoint::Endpoint(endpoint) => Region::Custom {
+                region: "us-east-1".to_string(),
+                endpoint: endpoint.to_string()
+            }
+        }
+    }
+}
+
+/*impl S3BlobStoreConfig {
+    fn region(&self) -> RegRegion {
+        use std::str::FromStr;
+        match self {
+            Region(region) => Region::from_str(region),
+            Endpoint(endpoint) => 
+        }
+    }
+}*/
 
 pub struct S3BlobStore {
     bucket: Bucket,
@@ -82,7 +123,7 @@ impl ToBlobStore<S3BlobStore> for S3BlobStoreConfig {
 
 impl S3BlobStore {
     fn init(config: S3BlobStoreConfig) -> Result<Self, BlobError> {
-        let bucket = Bucket::new(&config.bucket_name, config.region.clone(), config.credentials.clone())?;
+        let bucket = Bucket::new(&config.bucket_name, config.remote.to_region(), config.credentials.clone())?;
         Ok(S3BlobStore{
             bucket
         })
