@@ -18,9 +18,24 @@
     defaultPackage.${system} = pkgs.${pname};
 
     overlay = final: prev: {
-      "${pname}" = (import ./Cargo.nix {
-        pkgs = final;
-      }).rootCrate.build;
+      "${pname}" =
+      let
+        base = (import ./Cargo.nix {
+          pkgs = final;
+        });
+      in
+        base.rootCrate.build.override {
+          crateOverrides = final.defaultCrateOverrides // {
+            etcd-rs = attrs: {
+              nativeBuildInputs = [ final.rustfmt ];
+            };
+            prost-build = attrs: {
+              nativeBuildInputs = [ final.protobuf ];
+              PROTOC="${final.protobuf}/bin/protoc";
+              PROTOC_INCLUDE="${final.protobuf}/include";
+            };
+          };
+        };
     };
 
     devShell.${system} = with pkgs; mkShell {
