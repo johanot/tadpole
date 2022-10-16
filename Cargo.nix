@@ -96,6 +96,8 @@ rec {
           "Jonas Schievink <jonasschievink@gmail.com>"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "std" ];
           "rustc-dep-of-std" = [ "core" "compiler_builtins" ];
         };
@@ -110,6 +112,7 @@ rec {
         ];
         features = {
           "compile-time-rng" = [ "const-random" ];
+          "const-random" = [ "dep:const-random" ];
           "default" = [ "compile-time-rng" "std" ];
         };
       };
@@ -185,6 +188,7 @@ rec {
         ];
         features = {
           "derive_serde_style" = [ "serde" ];
+          "serde" = [ "dep:serde" ];
         };
       };
       "anyhow" = rec {
@@ -196,6 +200,7 @@ rec {
           "David Tolnay <dtolnay@gmail.com>"
         ];
         features = {
+          "backtrace" = [ "dep:backtrace" ];
           "default" = [ "std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -254,15 +259,26 @@ rec {
           "all" = [ "all-implementations" "all-algorithms" ];
           "all-algorithms" = [ "brotli" "bzip2" "deflate" "gzip" "lzma" "xz" "zlib" "zstd" ];
           "all-implementations" = [ "futures-io" "stream" "tokio-02" "tokio-03" "tokio" ];
+          "brotli" = [ "dep:brotli" ];
+          "bytes-05" = [ "dep:bytes-05" ];
+          "bzip2" = [ "dep:bzip2" ];
           "deflate" = [ "flate2" ];
+          "flate2" = [ "dep:flate2" ];
           "futures-bufread" = [ "futures-io" ];
+          "futures-io" = [ "dep:futures-io" ];
           "futures-write" = [ "futures-io" ];
           "gzip" = [ "flate2" ];
+          "libzstd" = [ "dep:libzstd" ];
           "lzma" = [ "xz2" ];
           "stream" = [ "bytes-05" ];
+          "tokio" = [ "dep:tokio" ];
+          "tokio-02" = [ "dep:tokio-02" ];
+          "tokio-03" = [ "dep:tokio-03" ];
           "xz" = [ "xz2" ];
+          "xz2" = [ "dep:xz2" ];
           "zlib" = [ "flate2" ];
           "zstd" = [ "libzstd" "zstd-safe" ];
+          "zstd-safe" = [ "dep:zstd-safe" ];
         };
         resolvedDefaultFeatures = [ "brotli" "default" "deflate" "flate2" "gzip" "tokio" ];
       };
@@ -389,11 +405,24 @@ rec {
           "charsets" = [ "encoding_rs" "encoding_rs_io" ];
           "compress" = [ "flate2" ];
           "default" = [ "compress" "tls" ];
+          "encoding_rs" = [ "dep:encoding_rs" ];
+          "encoding_rs_io" = [ "dep:encoding_rs_io" ];
+          "flate2" = [ "dep:flate2" ];
           "form" = [ "serde" "serde_urlencoded" ];
           "json" = [ "serde" "serde_json" ];
+          "mime" = [ "dep:mime" ];
+          "multipart" = [ "dep:multipart" ];
           "multipart-form" = [ "multipart" "mime" ];
+          "native-tls" = [ "dep:native-tls" ];
+          "openssl" = [ "dep:openssl" ];
+          "rustls" = [ "dep:rustls" ];
+          "serde" = [ "dep:serde" ];
+          "serde_json" = [ "dep:serde_json" ];
+          "serde_urlencoded" = [ "dep:serde_urlencoded" ];
           "tls" = [ "native-tls" "openssl" ];
           "tls-rustls" = [ "rustls" "webpki" "webpki-roots" ];
+          "webpki" = [ "dep:webpki" ];
+          "webpki-roots" = [ "dep:webpki-roots" ];
         };
         resolvedDefaultFeatures = [ "json" "native-tls" "openssl" "serde" "serde_json" "tls" ];
       };
@@ -528,6 +557,8 @@ rec {
           "The Rust Project Developers"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "core" "compiler_builtins" ];
         };
         resolvedDefaultFeatures = [ "default" ];
@@ -562,7 +593,9 @@ rec {
             packageId = "generic-array";
           }
         ];
-
+        features = {
+          "block-padding" = [ "dep:block-padding" ];
+        };
       };
       "brotli" = rec {
         crateName = "brotli";
@@ -591,10 +624,13 @@ rec {
           }
         ];
         features = {
+          "alloc-stdlib" = [ "dep:alloc-stdlib" ];
           "benchmark" = [ "brotli-decompressor/benchmark" ];
           "default" = [ "std" "ffi-api" ];
           "disable-timer" = [ "brotli-decompressor/disable-timer" ];
+          "packed_simd_2" = [ "dep:packed_simd_2" ];
           "seccomp" = [ "brotli-decompressor/seccomp" ];
+          "sha2" = [ "dep:sha2" ];
           "simd" = [ "packed_simd_2/into_bits" ];
           "std" = [ "alloc-stdlib" "brotli-decompressor/std" ];
           "validation" = [ "sha2" ];
@@ -623,6 +659,7 @@ rec {
           }
         ];
         features = {
+          "alloc-stdlib" = [ "dep:alloc-stdlib" ];
           "default" = [ "std" ];
           "std" = [ "alloc-stdlib" ];
           "unsafe" = [ "alloc-no-stdlib/unsafe" "alloc-stdlib/unsafe" ];
@@ -650,6 +687,7 @@ rec {
         features = {
           "default" = [ "slice-deque" ];
           "nightly" = [ "slice-deque/unstable" ];
+          "slice-deque" = [ "dep:slice-deque" ];
         };
       };
       "bumpalo" = rec {
@@ -688,6 +726,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
@@ -701,6 +740,7 @@ rec {
           "Alex Crichton <alex@alexcrichton.com>"
         ];
         features = {
+          "jobserver" = [ "dep:jobserver" ];
           "parallel" = [ "jobserver" ];
         };
       };
@@ -713,6 +753,8 @@ rec {
           "Alex Crichton <alex@alexcrichton.com>"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "core" "compiler_builtins" ];
         };
       };
@@ -757,9 +799,17 @@ rec {
         features = {
           "clock" = [ "libc" "std" "winapi" ];
           "default" = [ "clock" "std" "oldtime" ];
+          "js-sys" = [ "dep:js-sys" ];
+          "libc" = [ "dep:libc" ];
           "oldtime" = [ "time" ];
+          "pure-rust-locales" = [ "dep:pure-rust-locales" ];
+          "rustc-serialize" = [ "dep:rustc-serialize" ];
+          "serde" = [ "dep:serde" ];
+          "time" = [ "dep:time" ];
           "unstable-locales" = [ "pure-rust-locales" "alloc" ];
+          "wasm-bindgen" = [ "dep:wasm-bindgen" ];
           "wasmbind" = [ "wasm-bindgen" "js-sys" ];
+          "winapi" = [ "dep:winapi" ];
         };
         resolvedDefaultFeatures = [ "clock" "default" "libc" "oldtime" "std" "time" "winapi" ];
       };
@@ -807,12 +857,19 @@ rec {
           }
         ];
         features = {
+          "ansi_term" = [ "dep:ansi_term" ];
+          "atty" = [ "dep:atty" ];
+          "clippy" = [ "dep:clippy" ];
           "color" = [ "ansi_term" "atty" ];
           "default" = [ "suggestions" "color" "vec_map" ];
           "doc" = [ "yaml" ];
+          "strsim" = [ "dep:strsim" ];
           "suggestions" = [ "strsim" ];
+          "term_size" = [ "dep:term_size" ];
+          "vec_map" = [ "dep:vec_map" ];
           "wrap_help" = [ "term_size" "textwrap/term_size" ];
           "yaml" = [ "yaml-rust" ];
+          "yaml-rust" = [ "dep:yaml-rust" ];
         };
         resolvedDefaultFeatures = [ "ansi_term" "atty" "color" "default" "strsim" "suggestions" "vec_map" ];
       };
@@ -835,8 +892,10 @@ rec {
           }
         ];
         features = {
+          "chrono" = [ "dep:chrono" ];
           "mac_os_10_7_support" = [ "core-foundation-sys/mac_os_10_7_support" ];
           "mac_os_10_8_features" = [ "core-foundation-sys/mac_os_10_8_features" ];
+          "uuid" = [ "dep:uuid" ];
           "with-chrono" = [ "chrono" ];
           "with-uuid" = [ "uuid" ];
         };
@@ -914,6 +973,7 @@ rec {
           }
         ];
         features = {
+          "rand_core" = [ "dep:rand_core" ];
         };
         resolvedDefaultFeatures = [ "std" ];
       };
@@ -937,6 +997,8 @@ rec {
           }
         ];
         features = {
+          "blobby" = [ "dep:blobby" ];
+          "cipher" = [ "dep:cipher" ];
           "dev" = [ "blobby" ];
         };
       };
@@ -989,9 +1051,16 @@ rec {
           }
         ];
         features = {
+          "chrono" = [ "dep:chrono" ];
           "default" = [ "exec" "log" ];
+          "erased-serde" = [ "dep:erased-serde" ];
           "exec" = [ "serde" "serde_derive" "serde_json" ];
           "log" = [ "chrono" "erased-serde" "once_cell" "serde" "serde_derive" "serde_json" "uuid" ];
+          "once_cell" = [ "dep:once_cell" ];
+          "serde" = [ "dep:serde" ];
+          "serde_derive" = [ "dep:serde_derive" ];
+          "serde_json" = [ "dep:serde_json" ];
+          "uuid" = [ "dep:uuid" ];
         };
         resolvedDefaultFeatures = [ "chrono" "default" "erased-serde" "exec" "log" "once_cell" "serde" "serde_derive" "serde_json" "uuid" ];
       };
@@ -1015,12 +1084,15 @@ rec {
           }
         ];
         features = {
+          "blobby" = [ "dep:blobby" ];
+          "block-buffer" = [ "dep:block-buffer" ];
           "core-api" = [ "block-buffer" ];
           "default" = [ "core-api" ];
           "dev" = [ "blobby" ];
           "mac" = [ "subtle" ];
           "rand_core" = [ "crypto-common/rand_core" ];
           "std" = [ "alloc" "crypto-common/std" ];
+          "subtle" = [ "dep:subtle" ];
         };
         resolvedDefaultFeatures = [ "alloc" "block-buffer" "core-api" "default" "std" ];
       };
@@ -1039,6 +1111,7 @@ rec {
           }
         ];
         features = {
+          "blobby" = [ "dep:blobby" ];
           "dev" = [ "blobby" ];
           "std" = [ "alloc" ];
         };
@@ -1115,6 +1188,7 @@ rec {
         ];
         features = {
           "default" = [ "use_std" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "default" "use_std" ];
       };
@@ -1135,6 +1209,8 @@ rec {
         features = {
           "default" = [ "alloc" ];
           "fast-legacy-encode" = [ "fast-hangul-encode" "fast-hanja-encode" "fast-kanji-encode" "fast-gb-hanzi-encode" "fast-big5-hanzi-encode" ];
+          "packed_simd" = [ "dep:packed_simd" ];
+          "serde" = [ "dep:serde" ];
           "simd-accel" = [ "packed_simd" "packed_simd/into_bits" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" ];
@@ -1175,7 +1251,11 @@ rec {
           }
         ];
         features = {
+          "atty" = [ "dep:atty" ];
           "default" = [ "termcolor" "atty" "humantime" "regex" ];
+          "humantime" = [ "dep:humantime" ];
+          "regex" = [ "dep:regex" ];
+          "termcolor" = [ "dep:termcolor" ];
         };
         resolvedDefaultFeatures = [ "atty" "default" "humantime" "regex" "termcolor" ];
       };
@@ -1340,10 +1420,16 @@ rec {
           }
         ];
         features = {
+          "cloudflare-zlib-sys" = [ "dep:cloudflare-zlib-sys" ];
           "cloudflare_zlib" = [ "any_zlib" "cloudflare-zlib-sys" ];
           "default" = [ "rust_backend" ];
+          "futures" = [ "dep:futures" ];
+          "libz-sys" = [ "dep:libz-sys" ];
+          "miniz-sys" = [ "dep:miniz-sys" ];
+          "miniz_oxide" = [ "dep:miniz_oxide" ];
           "rust_backend" = [ "miniz_oxide" ];
           "tokio" = [ "tokio-io" "futures" ];
+          "tokio-io" = [ "dep:tokio-io" ];
           "zlib" = [ "any_zlib" "libz-sys" ];
           "zlib-ng-compat" = [ "zlib" "libz-sys/zlib-ng" ];
         };
@@ -1461,6 +1547,7 @@ rec {
           "compat" = [ "std" "futures-util/compat" ];
           "default" = [ "std" "async-await" "executor" ];
           "executor" = [ "std" "futures-executor/std" ];
+          "futures-executor" = [ "dep:futures-executor" ];
           "io-compat" = [ "compat" "futures-util/io-compat" ];
           "std" = [ "alloc" "futures-core/std" "futures-task/std" "futures-io/std" "futures-sink/std" "futures-util/std" "futures-util/io" "futures-util/channel" ];
           "thread-pool" = [ "executor" "futures-executor/thread-pool" ];
@@ -1490,6 +1577,7 @@ rec {
         features = {
           "alloc" = [ "futures-core/alloc" ];
           "default" = [ "std" ];
+          "futures-sink" = [ "dep:futures-sink" ];
           "sink" = [ "futures-sink" ];
           "std" = [ "alloc" "futures-core/std" ];
         };
@@ -1530,6 +1618,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "num_cpus" = [ "dep:num_cpus" ];
           "std" = [ "futures-core/std" "futures-task/std" "futures-util/std" ];
           "thread-pool" = [ "std" "num_cpus" ];
         };
@@ -1657,10 +1746,18 @@ rec {
           "channel" = [ "std" "futures-channel" ];
           "compat" = [ "std" "futures_01" ];
           "default" = [ "std" "async-await" "async-await-macro" ];
+          "futures-channel" = [ "dep:futures-channel" ];
+          "futures-io" = [ "dep:futures-io" ];
+          "futures-macro" = [ "dep:futures-macro" ];
+          "futures-sink" = [ "dep:futures-sink" ];
+          "futures_01" = [ "dep:futures_01" ];
           "io" = [ "std" "futures-io" "memchr" ];
           "io-compat" = [ "io" "compat" "tokio-io" ];
+          "memchr" = [ "dep:memchr" ];
           "sink" = [ "futures-sink" ];
+          "slab" = [ "dep:slab" ];
           "std" = [ "alloc" "futures-core/std" "futures-task/std" "slab" ];
+          "tokio-io" = [ "dep:tokio-io" ];
           "unstable" = [ "futures-core/unstable" "futures-task/unstable" ];
           "write-all-vectored" = [ "io" ];
         };
@@ -1689,6 +1786,7 @@ rec {
           }
         ];
         features = {
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "more_lengths" ];
       };
@@ -1718,8 +1816,12 @@ rec {
           }
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "js" = [ "wasm-bindgen" "js-sys" ];
+          "js-sys" = [ "dep:js-sys" ];
           "rustc-dep-of-std" = [ "compiler_builtins" "core" "libc/rustc-dep-of-std" "wasi/rustc-dep-of-std" ];
+          "wasm-bindgen" = [ "dep:wasm-bindgen" ];
         };
         resolvedDefaultFeatures = [ "std" ];
       };
@@ -1805,9 +1907,16 @@ rec {
           "Amanieu d'Antras <amanieu@gmail.com>"
         ];
         features = {
+          "ahash" = [ "dep:ahash" ];
           "ahash-compile-time-rng" = [ "ahash/compile-time-rng" ];
+          "alloc" = [ "dep:alloc" ];
+          "bumpalo" = [ "dep:bumpalo" ];
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "ahash" "inline-more" ];
+          "rayon" = [ "dep:rayon" ];
           "rustc-dep-of-std" = [ "nightly" "core" "compiler_builtins" "alloc" "rustc-internal-api" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "raw" ];
       };
@@ -1828,9 +1937,15 @@ rec {
           }
         ];
         features = {
+          "ahash" = [ "dep:ahash" ];
           "ahash-compile-time-rng" = [ "ahash/compile-time-rng" ];
+          "alloc" = [ "dep:alloc" ];
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "ahash" "inline-more" ];
+          "rayon" = [ "dep:rayon" ];
           "rustc-dep-of-std" = [ "nightly" "core" "compiler_builtins" "alloc" "rustc-internal-api" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "ahash" "default" "inline-more" ];
       };
@@ -1927,6 +2042,8 @@ rec {
           }
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "core" "compiler_builtins/rustc-dep-of-std" "libc/rustc-dep-of-std" ];
         };
         resolvedDefaultFeatures = [ "default" ];
@@ -1941,6 +2058,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
           "std" = [ "alloc" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "std" ];
@@ -2162,8 +2280,11 @@ rec {
         features = {
           "ffi" = [ "libc" ];
           "full" = [ "client" "http1" "http2" "server" "stream" "runtime" ];
+          "h2" = [ "dep:h2" ];
           "http2" = [ "h2" ];
+          "libc" = [ "dep:libc" ];
           "runtime" = [ "tcp" "tokio/rt" "tokio/time" ];
+          "socket2" = [ "dep:socket2" ];
           "tcp" = [ "socket2" "tokio/net" "tokio/rt" "tokio/time" ];
         };
         resolvedDefaultFeatures = [ "client" "default" "full" "h2" "http1" "http2" "runtime" "server" "socket2" "stream" "tcp" ];
@@ -2224,10 +2345,13 @@ rec {
           "default" = [ "native-tokio" "http1" "tls12" "logging" ];
           "http1" = [ "hyper/http1" ];
           "http2" = [ "hyper/http2" ];
+          "log" = [ "dep:log" ];
           "logging" = [ "log" "tokio-rustls/logging" "rustls/logging" ];
           "native-tokio" = [ "tokio-runtime" "rustls-native-certs" ];
+          "rustls-native-certs" = [ "dep:rustls-native-certs" ];
           "tls12" = [ "tokio-rustls/tls12" "rustls/tls12" ];
           "tokio-runtime" = [ "hyper/runtime" ];
+          "webpki-roots" = [ "dep:webpki-roots" ];
           "webpki-tokio" = [ "tokio-runtime" "webpki-roots" ];
         };
       };
@@ -2328,6 +2452,9 @@ rec {
           }
         ];
         features = {
+          "rayon" = [ "dep:rayon" ];
+          "rustc-rayon" = [ "dep:rustc-rayon" ];
+          "serde" = [ "dep:serde" ];
           "serde-1" = [ "serde" ];
         };
         resolvedDefaultFeatures = [ "std" ];
@@ -2347,7 +2474,11 @@ rec {
           }
         ];
         features = {
+          "js-sys" = [ "dep:js-sys" ];
+          "stdweb" = [ "dep:stdweb" ];
           "wasm-bindgen" = [ "js-sys" "wasm-bindgen_rs" "web-sys" ];
+          "wasm-bindgen_rs" = [ "dep:wasm-bindgen_rs" ];
+          "web-sys" = [ "dep:web-sys" ];
         };
       };
       "ipnet" = rec {
@@ -2360,6 +2491,8 @@ rec {
         ];
         features = {
           "json" = [ "serde" "schemars" ];
+          "schemars" = [ "dep:schemars" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "default" ];
       };
@@ -2418,6 +2551,7 @@ rec {
           "Marvin Löbel <loebel.marvin@gmail.com>"
         ];
         features = {
+          "spin" = [ "dep:spin" ];
           "spin_no_std" = [ "spin" ];
         };
       };
@@ -2432,6 +2566,7 @@ rec {
         features = {
           "default" = [ "std" ];
           "rustc-dep-of-std" = [ "align" "rustc-std-workspace-core" ];
+          "rustc-std-workspace-core" = [ "dep:rustc-std-workspace-core" ];
           "use_std" = [ "std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -2446,8 +2581,12 @@ rec {
           "Andrew Paseltiner <apaseltiner@gmail.com>"
         ];
         features = {
+          "clippy" = [ "dep:clippy" ];
+          "heapsize" = [ "dep:heapsize" ];
           "heapsize_impl" = [ "heapsize" ];
+          "serde" = [ "dep:serde" ];
           "serde_impl" = [ "serde" "serde_test" ];
+          "serde_test" = [ "dep:serde_test" ];
         };
       };
       "lock_api" = rec {
@@ -2466,6 +2605,8 @@ rec {
           }
         ];
         features = {
+          "owning_ref" = [ "dep:owning_ref" ];
+          "serde" = [ "dep:serde" ];
         };
       };
       "log" = rec {
@@ -2487,6 +2628,9 @@ rec {
           "kv_unstable_serde" = [ "kv_unstable_std" "value-bag/serde" "serde" ];
           "kv_unstable_std" = [ "std" "kv_unstable" "value-bag/error" ];
           "kv_unstable_sval" = [ "kv_unstable" "value-bag/sval" "sval" ];
+          "serde" = [ "dep:serde" ];
+          "sval" = [ "dep:sval" ];
+          "value-bag" = [ "dep:value-bag" ];
         };
         resolvedDefaultFeatures = [ "std" ];
       };
@@ -2560,7 +2704,10 @@ rec {
           "bluss"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "std" ];
+          "libc" = [ "dep:libc" ];
           "rustc-dep-of-std" = [ "core" "compiler_builtins" ];
           "use_std" = [ "std" ];
         };
@@ -2648,6 +2795,9 @@ rec {
           }
         ];
         features = {
+          "alloc" = [ "dep:alloc" ];
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "core" "alloc" "compiler_builtins" "adler/rustc-dep-of-std" ];
         };
       };
@@ -2730,6 +2880,7 @@ rec {
         ];
         features = {
           "default" = [ "serde_impl" ];
+          "serde" = [ "dep:serde" ];
           "serde_impl" = [ "serde" ];
         };
       };
@@ -2791,8 +2942,20 @@ rec {
           }
         ];
         features = {
+          "buf_redux" = [ "dep:buf_redux" ];
+          "clippy" = [ "dep:clippy" ];
           "default" = [ "client" "hyper" "iron" "mock" "nickel" "server" "tiny_http" ];
+          "httparse" = [ "dep:httparse" ];
+          "hyper" = [ "dep:hyper" ];
+          "iron" = [ "dep:iron" ];
+          "lazy_static" = [ "dep:lazy_static" ];
+          "nickel" = [ "dep:nickel" ];
+          "quick-error" = [ "dep:quick-error" ];
+          "rocket" = [ "dep:rocket" ];
+          "safemem" = [ "dep:safemem" ];
           "server" = [ "buf_redux" "httparse" "quick-error" "safemem" "twoway" ];
+          "tiny_http" = [ "dep:tiny_http" ];
+          "twoway" = [ "dep:twoway" ];
         };
         resolvedDefaultFeatures = [ "buf_redux" "httparse" "quick-error" "safemem" "server" "twoway" ];
       };
@@ -2932,6 +3095,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "libm" = [ "dep:libm" ];
         };
       };
       "num_cpus" = rec {
@@ -2966,7 +3130,9 @@ rec {
         ];
         features = {
           "alloc" = [ "race" ];
+          "atomic-polyfill" = [ "dep:atomic-polyfill" ];
           "default" = [ "std" ];
+          "parking_lot" = [ "dep:parking_lot" ];
           "std" = [ "alloc" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "race" "std" ];
@@ -3066,6 +3232,7 @@ rec {
           }
         ];
         features = {
+          "openssl-src" = [ "dep:openssl-src" ];
           "vendored" = [ "openssl-src" ];
         };
       };
@@ -3087,7 +3254,9 @@ rec {
             packageId = "hashbrown 0.9.1";
           }
         ];
-
+        features = {
+          "serde" = [ "dep:serde" ];
+        };
       };
       "parking_lot 0.11.2" = rec {
         crateName = "parking_lot";
@@ -3188,7 +3357,10 @@ rec {
           }
         ];
         features = {
+          "backtrace" = [ "dep:backtrace" ];
           "deadlock_detection" = [ "petgraph" "thread-id" "backtrace" ];
+          "petgraph" = [ "dep:petgraph" ];
+          "thread-id" = [ "dep:thread-id" ];
         };
       };
       "parking_lot_core 0.9.1" = rec {
@@ -3226,7 +3398,10 @@ rec {
           }
         ];
         features = {
+          "backtrace" = [ "dep:backtrace" ];
           "deadlock_detection" = [ "petgraph" "thread-id" "backtrace" ];
+          "petgraph" = [ "dep:petgraph" ];
+          "thread-id" = [ "dep:thread-id" ];
         };
       };
       "percent-encoding" = rec {
@@ -3263,7 +3438,10 @@ rec {
         features = {
           "all" = [ "unstable" "quickcheck" "matrix_graph" "stable_graph" "graphmap" ];
           "default" = [ "graphmap" "stable_graph" "matrix_graph" ];
+          "quickcheck" = [ "dep:quickcheck" ];
+          "serde" = [ "dep:serde" ];
           "serde-1" = [ "serde" "serde_derive" ];
+          "serde_derive" = [ "dep:serde_derive" ];
           "unstable" = [ "generate" ];
         };
       };
@@ -3427,9 +3605,14 @@ rec {
         features = {
           "default" = [ "protobuf" ];
           "gen" = [ "protobuf-codegen-pure" ];
+          "libc" = [ "dep:libc" ];
           "nightly" = [ "libc" ];
           "process" = [ "libc" "procfs" ];
+          "procfs" = [ "dep:procfs" ];
+          "protobuf" = [ "dep:protobuf" ];
+          "protobuf-codegen-pure" = [ "dep:protobuf-codegen-pure" ];
           "push" = [ "reqwest" "libc" "protobuf" ];
+          "reqwest" = [ "dep:reqwest" ];
         };
         resolvedDefaultFeatures = [ "default" "protobuf" ];
       };
@@ -3455,6 +3638,7 @@ rec {
         ];
         features = {
           "default" = [ "prost-derive" "std" ];
+          "prost-derive" = [ "dep:prost-derive" ];
         };
         resolvedDefaultFeatures = [ "default" "prost-derive" "std" ];
       };
@@ -3587,6 +3771,9 @@ rec {
           "Stepan Koltsov <stepan.koltsov@gmail.com>"
         ];
         features = {
+          "bytes" = [ "dep:bytes" ];
+          "serde" = [ "dep:serde" ];
+          "serde_derive" = [ "dep:serde_derive" ];
           "with-bytes" = [ "bytes" ];
           "with-serde" = [ "serde" "serde_derive" ];
         };
@@ -3618,6 +3805,8 @@ rec {
         ];
         features = {
           "encoding" = [ "encoding_rs" ];
+          "encoding_rs" = [ "dep:encoding_rs" ];
+          "serde" = [ "dep:serde" ];
           "serialize" = [ "serde" ];
         };
         resolvedDefaultFeatures = [ "default" ];
@@ -3675,6 +3864,11 @@ rec {
           "alloc" = [ "rand_core/alloc" ];
           "default" = [ "std" "std_rng" ];
           "getrandom" = [ "rand_core/getrandom" ];
+          "libc" = [ "dep:libc" ];
+          "log" = [ "dep:log" ];
+          "packed_simd" = [ "dep:packed_simd" ];
+          "rand_chacha" = [ "dep:rand_chacha" ];
+          "serde" = [ "dep:serde" ];
           "serde1" = [ "serde" "rand_core/serde1" ];
           "simd_support" = [ "packed_simd" ];
           "std" = [ "rand_core/std" "rand_chacha/std" "alloc" "getrandom" "libc" ];
@@ -3706,6 +3900,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
           "serde1" = [ "serde" ];
           "std" = [ "ppv-lite86/std" ];
         };
@@ -3728,6 +3923,8 @@ rec {
           }
         ];
         features = {
+          "getrandom" = [ "dep:getrandom" ];
+          "serde" = [ "dep:serde" ];
           "serde1" = [ "serde" ];
           "std" = [ "alloc" "getrandom" "getrandom/std" ];
         };
@@ -3773,6 +3970,7 @@ rec {
         features = {
           "auth" = [ "rust-argon2" ];
           "default" = [ "auth" ];
+          "rust-argon2" = [ "dep:rust-argon2" ];
         };
       };
       "regex" = rec {
@@ -3801,7 +3999,9 @@ rec {
           }
         ];
         features = {
+          "aho-corasick" = [ "dep:aho-corasick" ];
           "default" = [ "std" "perf" "unicode" "regex-syntax/default" ];
+          "memchr" = [ "dep:memchr" ];
           "perf" = [ "perf-cache" "perf-dfa" "perf-inline" "perf-literal" ];
           "perf-literal" = [ "aho-corasick" "memchr" ];
           "unicode" = [ "unicode-age" "unicode-bool" "unicode-case" "unicode-gencat" "unicode-perl" "unicode-script" "unicode-segment" "regex-syntax/unicode" ];
@@ -4082,25 +4282,43 @@ rec {
         ];
         features = {
           "__rustls" = [ "hyper-rustls" "tokio-rustls" "rustls" "__tls" "rustls-pemfile" ];
+          "async-compression" = [ "dep:async-compression" ];
           "blocking" = [ "futures-util/io" "tokio/rt-multi-thread" "tokio/sync" ];
           "brotli" = [ "async-compression" "async-compression/brotli" "tokio-util" ];
+          "cookie_crate" = [ "dep:cookie_crate" ];
+          "cookie_store" = [ "dep:cookie_store" ];
           "cookies" = [ "cookie_crate" "cookie_store" "proc-macro-hack" ];
           "default" = [ "default-tls" ];
           "default-tls" = [ "hyper-tls" "native-tls-crate" "__tls" "tokio-native-tls" ];
           "deflate" = [ "async-compression" "async-compression/zlib" "tokio-util" ];
           "gzip" = [ "async-compression" "async-compression/gzip" "tokio-util" ];
+          "hyper-rustls" = [ "dep:hyper-rustls" ];
+          "hyper-tls" = [ "dep:hyper-tls" ];
           "json" = [ "serde_json" ];
+          "mime_guess" = [ "dep:mime_guess" ];
           "multipart" = [ "mime_guess" ];
           "native-tls" = [ "default-tls" ];
           "native-tls-alpn" = [ "native-tls" "native-tls-crate/alpn" ];
+          "native-tls-crate" = [ "dep:native-tls-crate" ];
           "native-tls-vendored" = [ "native-tls" "native-tls-crate/vendored" ];
+          "proc-macro-hack" = [ "dep:proc-macro-hack" ];
+          "rustls" = [ "dep:rustls" ];
+          "rustls-native-certs" = [ "dep:rustls-native-certs" ];
+          "rustls-pemfile" = [ "dep:rustls-pemfile" ];
           "rustls-tls" = [ "rustls-tls-webpki-roots" ];
           "rustls-tls-manual-roots" = [ "__rustls" ];
           "rustls-tls-native-roots" = [ "rustls-native-certs" "__rustls" ];
           "rustls-tls-webpki-roots" = [ "webpki-roots" "__rustls" ];
+          "serde_json" = [ "dep:serde_json" ];
           "socks" = [ "tokio-socks" ];
           "stream" = [ "tokio/fs" "tokio-util" ];
+          "tokio-native-tls" = [ "dep:tokio-native-tls" ];
+          "tokio-rustls" = [ "dep:tokio-rustls" ];
+          "tokio-socks" = [ "dep:tokio-socks" ];
+          "tokio-util" = [ "dep:tokio-util" ];
           "trust-dns" = [ "trust-dns-resolver" ];
+          "trust-dns-resolver" = [ "dep:trust-dns-resolver" ];
+          "webpki-roots" = [ "dep:webpki-roots" ];
         };
         resolvedDefaultFeatures = [ "__rustls" "__tls" "async-compression" "default" "default-tls" "gzip" "hyper-rustls" "hyper-tls" "json" "native-tls" "native-tls-crate" "rustls" "rustls-pemfile" "rustls-tls-manual-roots" "serde_json" "stream" "tokio-native-tls" "tokio-rustls" "tokio-util" ];
       };
@@ -4177,6 +4395,7 @@ rec {
         features = {
           "default" = [ "alloc" "dev_urandom_fallback" ];
           "dev_urandom_fallback" = [ "once_cell" ];
+          "once_cell" = [ "dep:once_cell" ];
           "std" = [ "alloc" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "dev_urandom_fallback" "once_cell" ];
@@ -4202,6 +4421,7 @@ rec {
         ];
         features = {
           "case-insensitive" = [ "unicase" ];
+          "unicase" = [ "dep:unicase" ];
         };
         resolvedDefaultFeatures = [ "default" ];
       };
@@ -4333,11 +4553,18 @@ rec {
           }
         ];
         features = {
+          "async-std" = [ "dep:async-std" ];
+          "attohttpc" = [ "dep:attohttpc" ];
+          "block_on_proc" = [ "dep:block_on_proc" ];
           "blocking" = [ "block_on_proc" "tokio/rt" "tokio/rt-multi-thread" ];
           "default" = [ "tokio-native-tls" ];
+          "futures" = [ "dep:futures" ];
+          "reqwest" = [ "dep:reqwest" ];
+          "surf" = [ "dep:surf" ];
           "sync" = [ "attohttpc" "maybe-async/is_sync" ];
           "sync-native-tls" = [ "sync" "aws-creds/native-tls" "attohttpc/tls" ];
           "sync-rustls-tls" = [ "sync" "aws-creds/rustls-tls" "attohttpc/tls-rustls" ];
+          "tokio" = [ "dep:tokio" ];
           "tokio-native-tls" = [ "with-tokio" "reqwest/native-tls" "aws-creds/native-tls" ];
           "tokio-rustls-tls" = [ "with-tokio" "reqwest/rustls-tls" "aws-creds/rustls-tls" ];
           "with-async-std" = [ "async-std" "surf" "futures" ];
@@ -4384,6 +4611,7 @@ rec {
         ];
         features = {
           "default" = [ "logging" ];
+          "log" = [ "dep:log" ];
           "logging" = [ "log" ];
         };
         resolvedDefaultFeatures = [ "default" "log" "logging" ];
@@ -4424,8 +4652,10 @@ rec {
         ];
         features = {
           "default" = [ "logging" "tls12" ];
+          "log" = [ "dep:log" ];
           "logging" = [ "log" ];
           "read_buf" = [ "rustversion" ];
+          "rustversion" = [ "dep:rustversion" ];
         };
         resolvedDefaultFeatures = [ "dangerous_configuration" "default" "log" "logging" "tls12" ];
       };
@@ -4454,6 +4684,7 @@ rec {
           "David Tolnay <dtolnay@gmail.com>"
         ];
         features = {
+          "no-panic" = [ "dep:no-panic" ];
         };
       };
       "safemem" = rec {
@@ -4593,6 +4824,8 @@ rec {
           "OSX_10_14" = [ "OSX_10_13" "security-framework-sys/OSX_10_14" ];
           "OSX_10_9" = [ "security-framework-sys/OSX_10_9" ];
           "default" = [ "OSX_10_9" ];
+          "log" = [ "dep:log" ];
+          "num-bigint" = [ "dep:num-bigint" ];
           "serial-number-bigint" = [ "num-bigint" ];
         };
         resolvedDefaultFeatures = [ "OSX_10_9" "default" ];
@@ -4638,6 +4871,7 @@ rec {
         features = {
           "default" = [ "std" ];
           "derive" = [ "serde_derive" ];
+          "serde_derive" = [ "dep:serde_derive" ];
         };
         resolvedDefaultFeatures = [ "default" "rc" "std" ];
       };
@@ -4752,6 +4986,7 @@ rec {
         features = {
           "alloc" = [ "serde/alloc" ];
           "default" = [ "std" ];
+          "indexmap" = [ "dep:indexmap" ];
           "preserve_order" = [ "indexmap" ];
           "std" = [ "serde/std" ];
         };
@@ -4819,6 +5054,7 @@ rec {
         features = {
           "asm" = [ "sha1-asm" ];
           "default" = [ "std" ];
+          "sha1-asm" = [ "dep:sha1-asm" ];
           "std" = [ "digest/std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -4866,6 +5102,7 @@ rec {
           "asm" = [ "sha1-asm" ];
           "asm-aarch64" = [ "asm" ];
           "default" = [ "std" ];
+          "sha1-asm" = [ "dep:sha1-asm" ];
           "std" = [ "digest/std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -4912,6 +5149,7 @@ rec {
           "asm" = [ "sha2-asm" ];
           "asm-aarch64" = [ "asm" ];
           "default" = [ "std" ];
+          "sha2-asm" = [ "dep:sha2-asm" ];
           "std" = [ "digest/std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -4936,6 +5174,7 @@ rec {
           }
         ];
         features = {
+          "cc" = [ "dep:cc" ];
           "default" = [ "channel" "iterator" ];
           "extended-siginfo" = [ "channel" "iterator" "extended-siginfo-raw" ];
           "extended-siginfo-raw" = [ "cc" ];
@@ -4970,6 +5209,7 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
@@ -4982,7 +5222,9 @@ rec {
           "The Servo Project Developers"
         ];
         features = {
+          "arbitrary" = [ "dep:arbitrary" ];
           "const_new" = [ "const_generics" ];
+          "serde" = [ "dep:serde" ];
         };
       };
       "socket2" = rec {
@@ -5055,6 +5297,7 @@ rec {
         ];
         features = {
           "derive" = [ "strum_macros" ];
+          "strum_macros" = [ "dep:strum_macros" ];
         };
         resolvedDefaultFeatures = [ "derive" "strum_macros" ];
       };
@@ -5130,6 +5373,7 @@ rec {
           "default" = [ "derive" "parsing" "printing" "clone-impls" "proc-macro" ];
           "printing" = [ "quote" ];
           "proc-macro" = [ "proc-macro2/proc-macro" "quote/proc-macro" ];
+          "quote" = [ "dep:quote" ];
           "test" = [ "syn-test-suite/all-features" ];
         };
         resolvedDefaultFeatures = [ "clone-impls" "default" "derive" "extra-traits" "full" "parsing" "printing" "proc-macro" "quote" "visit" "visit-mut" ];
@@ -5340,7 +5584,10 @@ rec {
             packageId = "unicode-width";
           }
         ];
-
+        features = {
+          "hyphenation" = [ "dep:hyphenation" ];
+          "term_size" = [ "dep:term_size" ];
+        };
       };
       "thiserror" = rec {
         crateName = "thiserror";
@@ -5410,7 +5657,9 @@ rec {
             features = [ "std" "processthreadsapi" "winbase" ];
           }
         ];
-
+        features = {
+          "rustc-serialize" = [ "dep:rustc-serialize" ];
+        };
       };
       "tinyvec" = rec {
         crateName = "tinyvec";
@@ -5429,8 +5678,11 @@ rec {
         ];
         features = {
           "alloc" = [ "tinyvec_macros" ];
+          "arbitrary" = [ "dep:arbitrary" ];
           "real_blackbox" = [ "criterion/real_blackbox" ];
           "rustc_1_55" = [ "rustc_1_40" ];
+          "serde" = [ "dep:serde" ];
+          "tinyvec_macros" = [ "dep:tinyvec_macros" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "tinyvec_macros" ];
       };
@@ -5531,14 +5783,26 @@ rec {
           }
         ];
         features = {
+          "bytes" = [ "dep:bytes" ];
           "full" = [ "fs" "io-util" "io-std" "macros" "net" "parking_lot" "process" "rt" "rt-multi-thread" "signal" "sync" "time" ];
           "io-util" = [ "memchr" "bytes" ];
+          "libc" = [ "dep:libc" ];
           "macros" = [ "tokio-macros" ];
+          "memchr" = [ "dep:memchr" ];
+          "mio" = [ "dep:mio" ];
           "net" = [ "libc" "mio/os-poll" "mio/os-ext" "mio/net" "socket2" "winapi/namedpipeapi" ];
+          "num_cpus" = [ "dep:num_cpus" ];
+          "once_cell" = [ "dep:once_cell" ];
+          "parking_lot" = [ "dep:parking_lot" ];
           "process" = [ "bytes" "once_cell" "libc" "mio/os-poll" "mio/os-ext" "mio/net" "signal-hook-registry" "winapi/threadpoollegacyapiset" ];
           "rt-multi-thread" = [ "num_cpus" "rt" ];
           "signal" = [ "once_cell" "libc" "mio/os-poll" "mio/net" "mio/os-ext" "signal-hook-registry" "winapi/consoleapi" ];
+          "signal-hook-registry" = [ "dep:signal-hook-registry" ];
+          "socket2" = [ "dep:socket2" ];
           "test-util" = [ "rt" "sync" "time" ];
+          "tokio-macros" = [ "dep:tokio-macros" ];
+          "tracing" = [ "dep:tracing" ];
+          "winapi" = [ "dep:winapi" ];
         };
         resolvedDefaultFeatures = [ "bytes" "default" "fs" "full" "io-std" "io-util" "libc" "macros" "memchr" "mio" "net" "num_cpus" "once_cell" "parking_lot" "process" "rt" "rt-multi-thread" "signal" "signal-hook-registry" "socket2" "sync" "time" "tokio-macros" "winapi" ];
       };
@@ -5704,6 +5968,7 @@ rec {
           "signal" = [ "tokio/signal" ];
           "sync" = [ "tokio/sync" "tokio-util" ];
           "time" = [ "tokio/time" ];
+          "tokio-util" = [ "dep:tokio-util" ];
         };
         resolvedDefaultFeatures = [ "default" "time" ];
       };
@@ -5755,8 +6020,14 @@ rec {
           "connect" = [ "stream" "tokio/net" ];
           "default" = [ "connect" ];
           "native-tls" = [ "native-tls-crate" "tokio-native-tls" "stream" "tungstenite/native-tls" ];
+          "native-tls-crate" = [ "dep:native-tls-crate" ];
           "native-tls-vendored" = [ "native-tls" "native-tls-crate/vendored" "tungstenite/native-tls-vendored" ];
+          "rustls" = [ "dep:rustls" ];
           "rustls-tls" = [ "rustls" "tokio-rustls" "stream" "tungstenite/rustls-tls" "webpki" "webpki-roots" ];
+          "tokio-native-tls" = [ "dep:tokio-native-tls" ];
+          "tokio-rustls" = [ "dep:tokio-rustls" ];
+          "webpki" = [ "dep:webpki" ];
+          "webpki-roots" = [ "dep:webpki-roots" ];
         };
         resolvedDefaultFeatures = [ "connect" "default" "stream" ];
       };
@@ -5806,9 +6077,12 @@ rec {
           "__docs_rs" = [ "futures-util" ];
           "compat" = [ "futures-io" ];
           "full" = [ "codec" "compat" "io-util" "time" "net" "rt" ];
+          "futures-io" = [ "dep:futures-io" ];
+          "futures-util" = [ "dep:futures-util" ];
           "io-util" = [ "io" "tokio/rt" "tokio/io-util" ];
           "net" = [ "tokio/net" ];
           "rt" = [ "tokio/rt" ];
+          "slab" = [ "dep:slab" ];
           "time" = [ "tokio/time" "slab" ];
         };
         resolvedDefaultFeatures = [ "codec" "default" "io" ];
@@ -5859,9 +6133,12 @@ rec {
           "__docs_rs" = [ "futures-util" ];
           "compat" = [ "futures-io" ];
           "full" = [ "codec" "compat" "io-util" "time" "net" "rt" ];
+          "futures-io" = [ "dep:futures-io" ];
+          "futures-util" = [ "dep:futures-util" ];
           "io-util" = [ "io" "tokio/rt" "tokio/io-util" ];
           "net" = [ "tokio/net" ];
           "rt" = [ "tokio/rt" "tokio/sync" "futures-util" ];
+          "slab" = [ "dep:slab" ];
           "time" = [ "tokio/time" "slab" ];
         };
       };
@@ -5987,11 +6264,21 @@ rec {
           }
         ];
         features = {
+          "async-trait" = [ "dep:async-trait" ];
           "codegen" = [ "async-trait" ];
           "default" = [ "transport" "codegen" "prost" ];
+          "h2" = [ "dep:h2" ];
+          "hyper" = [ "dep:hyper" ];
           "prost" = [ "prost1" "prost-derive" ];
+          "prost-derive" = [ "dep:prost-derive" ];
+          "prost1" = [ "dep:prost1" ];
+          "rustls-native-certs" = [ "dep:rustls-native-certs" ];
           "tls" = [ "transport" "tokio-rustls" ];
           "tls-roots" = [ "tls" "rustls-native-certs" ];
+          "tokio" = [ "dep:tokio" ];
+          "tokio-rustls" = [ "dep:tokio-rustls" ];
+          "tower" = [ "dep:tower" ];
+          "tracing-futures" = [ "dep:tracing-futures" ];
           "transport" = [ "h2" "hyper" "tokio" "tower" "tracing-futures" "tokio/macros" "tokio/time" ];
         };
         resolvedDefaultFeatures = [ "async-trait" "codegen" "default" "h2" "hyper" "prost" "prost-derive" "prost1" "tls" "tokio" "tokio-rustls" "tower" "tracing-futures" "transport" ];
@@ -6026,6 +6313,7 @@ rec {
         features = {
           "default" = [ "transport" "rustfmt" "prost" ];
           "prost" = [ "prost-build" ];
+          "prost-build" = [ "dep:prost-build" ];
         };
         resolvedDefaultFeatures = [ "default" "prost" "prost-build" "rustfmt" "transport" ];
       };
@@ -6123,17 +6411,29 @@ rec {
           "discover" = [ "__common" ];
           "filter" = [ "__common" "futures-util" ];
           "full" = [ "balance" "buffer" "discover" "filter" "hedge" "limit" "load" "load-shed" "make" "ready-cache" "reconnect" "retry" "spawn-ready" "steer" "timeout" "util" ];
+          "futures-core" = [ "dep:futures-core" ];
+          "futures-util" = [ "dep:futures-util" ];
+          "hdrhistogram" = [ "dep:hdrhistogram" ];
           "hedge" = [ "util" "filter" "futures-util" "hdrhistogram" "tokio/time" "tracing" ];
+          "indexmap" = [ "dep:indexmap" ];
           "limit" = [ "__common" "tokio/time" "tokio/sync" "tokio-util" "tracing" ];
           "load" = [ "__common" "tokio/time" "tracing" ];
           "load-shed" = [ "__common" ];
           "log" = [ "tracing/log" ];
           "make" = [ "futures-util" "pin-project-lite" "tokio/io-std" ];
+          "pin-project" = [ "dep:pin-project" ];
+          "pin-project-lite" = [ "dep:pin-project-lite" ];
+          "rand" = [ "dep:rand" ];
           "ready-cache" = [ "futures-core" "futures-util" "indexmap" "tokio/sync" "tracing" ];
           "reconnect" = [ "make" "tokio/io-std" "tracing" ];
           "retry" = [ "__common" "tokio/time" ];
+          "slab" = [ "dep:slab" ];
           "spawn-ready" = [ "__common" "futures-util" "tokio/sync" "tokio/rt" "util" "tracing" ];
           "timeout" = [ "pin-project-lite" "tokio/time" ];
+          "tokio" = [ "dep:tokio" ];
+          "tokio-stream" = [ "dep:tokio-stream" ];
+          "tokio-util" = [ "dep:tokio-util" ];
+          "tracing" = [ "dep:tracing" ];
           "util" = [ "__common" "futures-util" "pin-project" ];
         };
         resolvedDefaultFeatures = [ "__common" "balance" "buffer" "default" "discover" "futures-core" "futures-util" "indexmap" "limit" "load" "log" "make" "pin-project" "pin-project-lite" "rand" "ready-cache" "slab" "timeout" "tokio" "tokio-util" "tracing" "util" ];
@@ -6201,8 +6501,10 @@ rec {
         features = {
           "attributes" = [ "tracing-attributes" ];
           "default" = [ "std" "attributes" ];
+          "log" = [ "dep:log" ];
           "log-always" = [ "log" ];
           "std" = [ "tracing-core/std" ];
+          "tracing-attributes" = [ "dep:tracing-attributes" ];
           "valuable" = [ "tracing-core/valuable" ];
         };
         resolvedDefaultFeatures = [ "attributes" "default" "log" "std" "tracing-attributes" ];
@@ -6254,7 +6556,9 @@ rec {
         ];
         features = {
           "default" = [ "std" "valuable/std" ];
+          "lazy_static" = [ "dep:lazy_static" ];
           "std" = [ "lazy_static" ];
+          "valuable" = [ "dep:valuable" ];
         };
         resolvedDefaultFeatures = [ "lazy_static" "std" ];
       };
@@ -6281,10 +6585,16 @@ rec {
         ];
         features = {
           "default" = [ "std-future" "std" ];
+          "futures" = [ "dep:futures" ];
           "futures-01" = [ "futures_01" "std" ];
           "futures-03" = [ "std-future" "futures" "futures-task" "std" ];
+          "futures-task" = [ "dep:futures-task" ];
+          "futures_01" = [ "dep:futures_01" ];
+          "pin-project" = [ "dep:pin-project" ];
           "std" = [ "tracing/std" ];
           "std-future" = [ "pin-project" ];
+          "tokio" = [ "dep:tokio" ];
+          "tokio-executor" = [ "dep:tokio-executor" ];
         };
         resolvedDefaultFeatures = [ "default" "pin-project" "std" "std-future" ];
       };
@@ -6379,8 +6689,12 @@ rec {
         ];
         features = {
           "native-tls" = [ "native-tls-crate" ];
+          "native-tls-crate" = [ "dep:native-tls-crate" ];
           "native-tls-vendored" = [ "native-tls" "native-tls-crate/vendored" ];
+          "rustls" = [ "dep:rustls" ];
+          "rustls-native-certs" = [ "dep:rustls-native-certs" ];
           "rustls-tls" = [ "rustls" "webpki" "rustls-native-certs" ];
+          "webpki" = [ "dep:webpki" ];
         };
       };
       "twoway" = rec {
@@ -6402,7 +6716,10 @@ rec {
           "all" = [ "jetscii" "pcmp" "pattern" "test-set" ];
           "benchmarks" = [ "galil-seiferas" "pattern" "unchecked-index" ];
           "default" = [ "use_std" ];
+          "galil-seiferas" = [ "dep:galil-seiferas" ];
+          "jetscii" = [ "dep:jetscii" ];
           "pcmp" = [ "unchecked-index" ];
+          "unchecked-index" = [ "dep:unchecked-index" ];
           "use_std" = [ "memchr/use_std" ];
         };
         resolvedDefaultFeatures = [ "default" "use_std" ];
@@ -6418,6 +6735,7 @@ rec {
           "Andre Bogus <bogusandre@gmail.com>"
         ];
         features = {
+          "scale-info" = [ "dep:scale-info" ];
           "scale_info" = [ "scale-info/derive" ];
         };
       };
@@ -6449,7 +6767,10 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "flame" = [ "dep:flame" ];
           "flame_it" = [ "flame" "flamer" ];
+          "flamer" = [ "dep:flamer" ];
+          "serde" = [ "dep:serde" ];
           "with_serde" = [ "serde" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
@@ -6497,7 +6818,10 @@ rec {
           "Manish Goregaokar <manishsmail@gmail.com>"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "std" "core" "compiler_builtins" ];
+          "std" = [ "dep:std" ];
         };
         resolvedDefaultFeatures = [ "default" ];
       };
@@ -6552,7 +6876,9 @@ rec {
             packageId = "percent-encoding";
           }
         ];
-
+        features = {
+          "serde" = [ "dep:serde" ];
+        };
       };
       "utf-8" = rec {
         crateName = "utf-8";
@@ -6585,12 +6911,18 @@ rec {
         ];
         features = {
           "default" = [ "std" ];
+          "getrandom" = [ "dep:getrandom" ];
           "guid" = [ "winapi" ];
+          "md5" = [ "dep:md5" ];
+          "serde" = [ "dep:serde" ];
+          "sha1" = [ "dep:sha1" ];
+          "slog" = [ "dep:slog" ];
           "stdweb" = [ "getrandom" "getrandom/js" ];
           "v3" = [ "md5" ];
           "v4" = [ "getrandom" ];
           "v5" = [ "sha1" ];
           "wasm-bindgen" = [ "getrandom" "getrandom/js" ];
+          "winapi" = [ "dep:winapi" ];
         };
         resolvedDefaultFeatures = [ "default" "getrandom" "std" "v4" ];
       };
@@ -6639,6 +6971,7 @@ rec {
         ];
         features = {
           "eders" = [ "serde" ];
+          "serde" = [ "dep:serde" ];
         };
       };
       "version_check" = rec {
@@ -6800,11 +7133,15 @@ rec {
           }
         ];
         features = {
+          "async-compression" = [ "dep:async-compression" ];
           "compression" = [ "compression-brotli" "compression-gzip" ];
           "compression-brotli" = [ "async-compression/brotli" ];
           "compression-gzip" = [ "async-compression/deflate" "async-compression/gzip" ];
           "default" = [ "multipart" "websocket" ];
+          "multipart" = [ "dep:multipart" ];
           "tls" = [ "tokio-rustls" ];
+          "tokio-rustls" = [ "dep:tokio-rustls" ];
+          "tokio-tungstenite" = [ "dep:tokio-tungstenite" ];
           "websocket" = [ "tokio-tungstenite" ];
         };
         resolvedDefaultFeatures = [ "async-compression" "compression" "compression-brotli" "compression-gzip" "default" "multipart" "tokio-tungstenite" "websocket" ];
@@ -6818,8 +7155,11 @@ rec {
           "The Cranelift Project Developers"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "std" ];
           "rustc-dep-of-std" = [ "compiler_builtins" "core" "rustc-std-workspace-alloc" ];
+          "rustc-std-workspace-alloc" = [ "dep:rustc-std-workspace-alloc" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
@@ -6832,8 +7172,11 @@ rec {
           "The Cranelift Project Developers"
         ];
         features = {
+          "compiler_builtins" = [ "dep:compiler_builtins" ];
+          "core" = [ "dep:core" ];
           "default" = [ "std" ];
           "rustc-dep-of-std" = [ "compiler_builtins" "core" "rustc-std-workspace-alloc" ];
+          "rustc-std-workspace-alloc" = [ "dep:rustc-std-workspace-alloc" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
@@ -6858,7 +7201,9 @@ rec {
         features = {
           "default" = [ "spans" "std" ];
           "enable-interning" = [ "std" ];
+          "serde" = [ "dep:serde" ];
           "serde-serialize" = [ "serde" "serde_json" "std" ];
+          "serde_json" = [ "dep:serde_json" ];
           "spans" = [ "wasm-bindgen-macro/spans" ];
           "strict-macro" = [ "wasm-bindgen-macro/strict-macro" ];
           "xxx_debug_only_print_generated_code" = [ "wasm-bindgen-macro/xxx_debug_only_print_generated_code" ];
@@ -6938,6 +7283,7 @@ rec {
           }
         ];
         features = {
+          "futures-core" = [ "dep:futures-core" ];
           "futures-core-03-stream" = [ "futures-core" ];
         };
       };
@@ -7533,7 +7879,9 @@ rec {
             packageId = "libc";
           }
         ];
-
+        features = {
+          "regex" = [ "dep:regex" ];
+        };
       };
       "wildmatch" = rec {
         crateName = "wildmatch";
@@ -8410,6 +8758,8 @@ rec {
           }
         ];
         features = {
+          "chrono" = [ "dep:chrono" ];
+          "serde" = [ "dep:serde" ];
           "serialization-serde" = [ "transactions" "serde" ];
           "transactions" = [ "winapi/ktmw32" ];
         };
