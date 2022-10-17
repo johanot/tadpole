@@ -1,4 +1,4 @@
 {
-  "dbc-rust-modules 0.1.0 (git+https://github.com/dbcdk/rust-modules?branch=main#fc8fcd2d5bc7029108418579a2702ed28189c607)": "1cc6hw021jam389j45fjxmi7hd0df0aq69f2a72v64wg1d0rwhh4",
+  "dbc-rust-modules 0.1.0 (git+https://github.com/dbcdk/rust-modules?branch=main#d5f3fb05eb5a5ce27f5acb21dcc4522b16957abb)": "083kdxw0zpxhk4ad82r9qirzwlv58n2b6iw8b9qlwna1sisyamik",
   "rust-s3 0.27.0-rc4 (git+https://github.com/johanot/rust-s3?branch=copy-object-and-multipart-upload#94854997337d857f25e3f67fce510a3d06e61834)": "1wyryhx1dcig018c0cpg88wccfsbj4bv5y8pby4a9a43wclvnfsb"
 }
