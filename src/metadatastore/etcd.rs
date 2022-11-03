@@ -48,7 +48,8 @@ fn get_key_for_reference(prefix: &str, repo: &str, name: &str, reference: &str) 
 
 impl EtcdMetadataStore {
   fn init(config: EtcdMetadataStoreConfig) -> Result<Self, MetadataError> {
-    use tonic::transport::{Certificate, ClientTlsConfig, Identity};
+    use tonic::transport::{Certificate, Identity};
+    use tonic::transport::channel::ClientTlsConfig;
     use std::fs;
 
     let endpoints = config.endpoints.clone();

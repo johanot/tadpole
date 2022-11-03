@@ -12,6 +12,7 @@ use crate::blobstore::Blob;
 use crate::blobstore::StreamWriter;
 use crate::blobstore::UploadData;
 use s3::serde_types::InitiateMultipartUploadResponse;
+use s3::error::S3Error;
 use dbc_rust_modules::log;
 
 use uuid::Uuid;
@@ -115,6 +116,14 @@ impl std::convert::From<anyhow::Error> for BlobError {
     }
 }
 
+impl std::convert::From<S3Error> for BlobError {
+    fn from(err: S3Error) -> Self {
+        Self::Other{
+            inner: Box::new(err)
+        }
+    }
+}
+
 impl ToBlobStore<S3BlobStore> for S3BlobStoreConfig {
     fn to_blob_store(&self) -> S3BlobStore {
         S3BlobStore::init(self.clone()).unwrap()
@@ -131,7 +140,7 @@ impl S3BlobStore {
 }
 
 async fn gimme_raw(bucket: Bucket, path: String, mut writer: StreamWriter) {    
-    bucket.get_object_stream(path, &mut writer).await.unwrap();
+    let stream = bucket.get_object_stream(path).await.unwrap();
 }
 
 fn gimme(bucket: Bucket, info: BlobInfo, mut writer: StreamWriter) {
